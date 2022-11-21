@@ -22,9 +22,74 @@ class Monkey :
     def reset_agent(self,init_pos,rank) : 
         self.pos,self.position_history,self.reward_history,self.rank = init_pos, [init_pos], [] ,rank 
 
+class AgentMap : 
+    def __init__(self,env) : 
+        self.env = env 
+        self.height = env.height 
+        self.width = env.width
+        self.random_init = env.random_init
+        self.n = env.n 
+         
+    def reset_map(self) : 
+        self.map =  np.zeros((self.height,self.width))
+
+    def set_agent_positions(self,positions) : 
+        self.reset_map() 
+        for id,pos in positions.items() :
+            self.map[pos[0]][pos[1]] = id
+
+    def update(self,id,newpos,oldpos) : 
+        self.map[newpos[0]][newpos[1]] = id 
+        self.map[oldpos[0]][oldpos[1]] = 0
+
+    def swap(self,ids,newpos) : 
+        for i,pos in zip(ids,newpos) : 
+            self.map[pos[0]][pos[1]] = i 
+
+    def query(self,newpos) : 
+        try :
+            return self.map[newpos[0]][newpos[1]]
+        except :
+            print('Not Found on Map, invalid query') 
+
+    def sample_random_location(self) : 
+        sampled = False 
+        while not sampled : 
+            random_height = np.random.randint(0,self.height) 
+            random_width = np.random.randint(0,self.width)  
+            if self.env.world_map[random_height][random_width] != -1 : 
+                sampled = True 
+        return [random_height,random_width] 
+
+    def sample_fixed_location(self) :
+        # This samples fixed locations at the middle row, so all agents start in the middle row. 
+        height = int(self.height/2)
+        random_width = np.random.randint(0,self.width)  
+        return [height,random_width] 
+
+    def sample_positions(self) : 
+        pos = {} 
+        for i in range(1,self.n+1): 
+            if self.random_init : 
+                new_pos = self.sample_random_location() 
+            else : 
+                new_pos = self.sample_fixed_location() 
+            while new_pos in list(pos.values()) : 
+               if self.random_init : 
+                    new_pos = self.sample_random_location() 
+               else : 
+                    new_pos = self.sample_fixed_location()   
+            pos[i] = new_pos  
+        return pos 
+
+    def initialize_agents(self) : 
+        self.reset_map() 
+        pos = self.sample_positions() 
+        self.set_agent_positions(pos) 
+        return pos 
 
 class SortingEnv(gym.Env):
-    def __init__(self,n=4) :
+    def __init__(self,n=4,random_init=True) :
         self.height = 5 
         self.n = n 
         if self.n%2!=0:
@@ -37,19 +102,19 @@ class SortingEnv(gym.Env):
         self.moves = {0:[-1,0],1:[0,1],2:[1,0],3:[0,-1],4:[0,0]}  
         self.max_reward = n*2 
         self.min_reward = 2 
-        self.invalid_move_reward = -2
-        self.out_of_bounds_reward = -2 
+        self.invalid_move_reward = -1
+        self.out_of_bounds_reward = -1 
         self.color_mapping = {1:[255,255,0],-1:[0,0,0],0:[255,255,255]} 
         self.agent_colors =  {1:[102,0,0],2:[204,0,0],3:[255,102,102],4:[0,102,102],5:[0,204,204],6:[102,255,255],7:[0,255,0],8:[155,253,155]}
+        self.random_init = random_init
         self.build_env() 
         self.reset() 
 
     def reset(self) : 
         self.fight_history = {} 
-        init_pos = self.sample_agent_positions() 
-        self.set_agent_positions(init_pos)
+        init_pos = self.agent_map.initialize_agents() 
         agent_ranks = [i for i in range(1,self.n+1)]
-        random.shuffle(agent_ranks) 
+        #random.shuffle(agent_ranks) 
         self.agent_ranks = {i:agent_ranks[i-1] for i in range(1,self.n+1) }
         self.agents ={}
         self.agent_color_mapping = {}  
@@ -59,22 +124,17 @@ class SortingEnv(gym.Env):
 
     def step(self,actions) : 
         new_positions, rewards = self.collision_check(actions) 
-       
         for monkey in self.agents.values() : 
             monkey.update(new_positions[monkey.id],rewards[monkey.id]) 
-        self.set_agent_positions(new_positions)
-        print(rewards) 
+        self.agent_map.set_agent_positions(new_positions)
         return 0,rewards,0 
-
-    def update_agent_map(self,newpos) : 
-        self.agent_map =  np.zeros((self.height,self.width))
 
     def add(self,pos,move) : 
         return (pos[0]+move[0],pos[1]+move[1])
 
     def build_env(self):
         self.world_map = np.zeros((self.height,self.width))
-        self.agent_map =  np.zeros((self.height,self.width))
+        self.agent_map =  AgentMap(self)
         self.banana_locations = [i for i in range(0,self.width,3)] 
         self.banana_rewards= {} 
         for j in [0,self.height-1] :
@@ -90,33 +150,6 @@ class SortingEnv(gym.Env):
                 self.banana_rewards[(j,i)] = current_reward 
                 current_reward-=self.min_reward 
         
-    def sample_random_location(self) : 
-        random_height = np.random.randint(1,self.height-1) 
-        random_width = np.random.randint(0,self.width) 
-        return [random_height,random_width]
-
-    def sample_agent_positions(self) : 
-        pos = {} 
-        for i in range(1,self.n+1): 
-            new_pos = self.sample_random_location() 
-            while new_pos in list(pos.values()) : 
-               new_pos = self.sample_random_location()  
-            pos[i] = new_pos  
-        return pos 
-
-    def set_agent_positions (self,positions) : 
-        self.agent_map =  np.zeros((self.height,self.width))
-        for id,pos in positions.items() :
-            self.agent_map[pos[0]][pos[1]] = id
-
-    def update_position(self,id,newpos,oldpos) : 
-        self.agent_map[newpos[0]][newpos[1]] = id 
-        self.agent_map[oldpos[0]][oldpos[1]] = 0
-
-    def swap_positions(self,ids,newpos) : 
-        for i,pos in zip(ids,newpos) : 
-            self.agent_map[pos[0]][pos[1]] = i
-    
     def get_width(self,n) :
         if n==2 : 
             return 2 
@@ -139,6 +172,7 @@ class SortingEnv(gym.Env):
             agent_pos = self.agents[agent_id].pos 
             agent_move = self.moves[actions[agent_id]] 
             newpos = self.add(agent_pos,agent_move)  
+            #Ignore agents at reward locations for now as they might have to fight 
             if tuple(agent_pos) in self.banana_rewards : 
                     not_set.append(agent_id)
             #Out of Bounds Move 
@@ -150,15 +184,15 @@ class SortingEnv(gym.Env):
                 new_pos_dict[agent_id] = agent_pos 
                 rewards_dict[agent_id] = self.invalid_move_reward 
             # Easy to check valid move
-            elif self.agent_map[newpos[0]][newpos[1]] == 0 : 
+            elif self.agent_map.query(newpos) == 0 : 
                 new_pos_dict[agent_id] = newpos 
                 if newpos in self.banana_rewards  : 
                     rewards_dict[agent_id] = self.banana_rewards[newpos] 
                 else : 
                     rewards_dict[agent_id] = 0 
-                self.update_position(agent_id,newpos,agent_pos)
+                self.agent_map.update(agent_id,newpos,agent_pos)
             # Trying to move into another agent 
-            elif self.agent_map[newpos[0]][newpos[1]] != 0 : 
+            elif self.agent_map.query(newpos) != 0 : 
                 not_set.append(agent_id)  
             else :
                 print('Which case is this 1!?') 
@@ -179,16 +213,16 @@ class SortingEnv(gym.Env):
                         remove.append(agent_id)
                     continue 
                 # Easy to check valid move (In case the agent it was trying to move into changed positions)
-                elif self.agent_map[newpos[0]][newpos[1]] == 0 : 
+                elif self.agent_map.query(newpos) == 0 : 
                     new_pos_dict[agent_id] = newpos 
                     rewards_dict[agent_id] = 0 
                     if newpos in self.banana_rewards  : 
                         rewards_dict[agent_id] = self.banana_rewards[newpos] 
-                    self.update_position(agent_id,newpos,agent_pos)
+                    self.agent_map.update(agent_id,newpos,agent_pos)
                     remove.append(agent_id)
                 # Trying to move into another agent 
-                elif self.agent_map[newpos[0]][newpos[1]] != 0 : 
-                    agent_flag= self.agent_map[newpos[0]][newpos[1]]
+                elif self.agent_map.query(newpos) != 0 : 
+                    agent_flag= self.agent_map.query(newpos)
                     # That agent wants to/ will stay at its current position 
                     if actions[agent_flag] ==0 or self.invalid_action(newpos,actions[agent_flag]) :
                         if newpos not in self.banana_rewards : 
@@ -204,7 +238,7 @@ class SortingEnv(gym.Env):
                                 remove.append(agent_flag) 
                                 remove.append(agent_id)
                                 self.fight_history[(agent_flag,agent_id)] = agent_id
-                                self.swap_positions([agent_id,agent_flag],[newpos,agent_pos])
+                                self.agent_map.swap([agent_id,agent_flag],[newpos,agent_pos])
                             else : 
                                 new_pos_dict[agent_id] = agent_pos 
                                 new_pos_dict[agent_flag] = newpos 
@@ -223,29 +257,28 @@ class SortingEnv(gym.Env):
             not_set.remove(id) 
         remove =[] 
         #Some iterations to see if chain of collisions resolve itself, this case could arise if agents are following each other in a line
-        for i in range(self.n-1) : 
+        for _ in range(self.n-1) : 
             for agent_id in not_set : 
                 if agent_id not in new_pos_dict :
                     agent_pos = self.agents[agent_id].pos 
                     agent_move = self.moves[actions[agent_id]] 
                     newpos = self.add(agent_pos,agent_move)  
-                    agent_flag = self.agent_map[newpos[0]][newpos[1]]
+                    agent_flag = self.agent_map.query(newpos)
                     # Easy to check valid move (In case the agent it was trying to move into changed positions)
                     if agent_flag == 0 and newpos not in self.banana_rewards: 
                         new_pos_dict[agent_id] = newpos 
                         rewards_dict[agent_id] = 0 
-                        self.update_position(agent_id,newpos,agent_pos)
+                        self.agent_map.update(agent_id,newpos,agent_pos)
                         remove.append(agent_id)
                 else :
                     remove.append(agent_id)
 
-        remove = list(set(remove)) 
-        
-        for id in remove : 
-            not_set.remove(id) 
-        remove =[] 
+            remove = list(set(remove)) 
+            
+            for id in remove : 
+                not_set.remove(id) 
+            remove =[] 
         # There must be a cycle of some sort, let's stop remaining agents and give 0 reward 
-        print(not_set)
         for agent_id in not_set : 
                 if agent_id not in new_pos_dict : 
                     new_pos_dict[agent_id]  = self.agents[agent_id].pos 
@@ -255,8 +288,8 @@ class SortingEnv(gym.Env):
             not_set.remove(id) 
 
         for id,r in rewards_dict.items() :
-            if tuple(new_pos_dict[id]) in self.banana_rewards and r<0 :
-                rewards_dict[id]+= self.banana_rewards[new_pos_dict[id]]
+            if tuple(new_pos_dict[id]) in self.banana_rewards and r<=0 :
+                rewards_dict[id]+= self.banana_rewards[tuple(new_pos_dict[id])]
 
         assert len(not_set) ==0 
         return new_pos_dict,rewards_dict
@@ -276,9 +309,9 @@ class SortingEnv(gym.Env):
 
         for i in range(board_h):
             for j in range(board_w):
-                agent_present = self.agent_map[i, j] 
+                agent_present = self.agent_map.query([i, j]) 
                 if agent_present : 
-                    color = self.agent_color_mapping[int(self.agent_map[i, j])]
+                    color = self.agent_color_mapping[int(self.agent_map.query([i, j]) )]
                     rgb_array[i * 32 : (i + 1) * 32, j * 32 : (j + 1) * 32] = color
 
         for i in range(board_h):
@@ -291,31 +324,34 @@ class SortingEnv(gym.Env):
         return rgb_array
 
 if __name__=='__main__':
-    env = SortingEnv(8) 
+    env = SortingEnv(4,False) 
     array = env.render()
-   # plt.imshow(array) 
-   # plt.show() 
-   # plt.close() 
+    plt.imshow(array) 
+    plt.show() 
+    plt.close() 
     break_flag = 0
-    for j in range(1000): 
-        imgs =[] 
+    for j in range(1): 
+        imgs =[Image.fromarray(array)] 
         for _ in range(20) : 
             actions = {} 
-            for i in range(1,9) : 
-                actions[i] = env.action_space.sample() #int(in_actions[i-1]) 
+            a = str(input())
+            for i in range(1,5) : 
+                actions[i] = int(a[i-1])  #env.action_space.sample() #
            # try :
             env.step(actions) 
+            array = env.render()
+            plt.imshow(array) 
+            plt.show()
+            plt.close() 
             #except :
             #    break_flag = 1
             #    break 
-            array = env.render()
             imgs.append(Image.fromarray(array))
         print(j) 
         imgs[0].save("array2.gif", save_all=True, append_images=imgs[1:], duration=10, loop=0)
         if break_flag :
             break 
         env.reset() 
-      #  plt.imshow(array) 
-      #  plt.show()
-      #  plt.close() 
+        array = env.render() 
+        
 
