@@ -4,7 +4,8 @@ import numpy as np
 import random 
 import matplotlib.pyplot as plt
 from PIL import Image
-
+#Python program to print topological sorting of a DAG
+import networkx as nx 
 
 class Monkey : 
 
@@ -16,13 +17,15 @@ class Monkey :
         self.reward_history = []
         self.fights = 0 
         self.fights_won = 0  
+        self.fight_dict = {} 
 
     def update(self,new_pos,r) : 
         self.pos = new_pos 
         self.position_history.append(new_pos) 
         self.reward_history.append(r) 
 
-    def fight_update(self,win) : 
+    def fight_update(self,win,agent_id) : 
+        self.fight_dict[agent_id] = win 
         if win :
             self.fights+=1 
             self.fights_won +=1 
@@ -31,6 +34,7 @@ class Monkey :
 
     def reset_agent(self,init_pos,rank) : 
         self.pos,self.position_history,self.reward_history,self.rank,self.fights,self.fights_won = init_pos, [init_pos], [] ,rank ,0,0 
+        self.fight_dict = {} 
 
 class AgentMap : 
     def __init__(self,env) : 
@@ -97,3 +101,24 @@ class AgentMap :
         pos = self.sample_positions() 
         self.set_agent_positions(pos) 
         return pos 
+
+class FightGraph() : 
+    def __init__(self,env) : 
+        self.env = env 
+        self.reset() 
+
+    def update(self,win_agent,losing_agent) : 
+        # If there is a directed path between these two agents, then the recent fight was redundant as the order can be determined from environment history
+        a = nx.has_path(self.graph,win_agent,losing_agent)
+        b = nx.has_path(self.graph,losing_agent,win_agent) 
+        if a or b : 
+            return True 
+        else : 
+            self.graph.add_edge(win_agent,losing_agent) 
+            return False 
+        
+    def reset(self) : 
+        self.graph = nx.DiGraph()  
+        for i in range(1,self.env.n+1) : 
+            self.graph.add_node(i)
+

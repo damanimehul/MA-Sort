@@ -12,6 +12,7 @@ class Observer:
         self.env = env 
         self.obs_type = obs_type  
         self.fights_info = fights_info 
+        self.observation_shape = self.obs_shape() 
 
     def obs_shape(self) : 
         if self.obs_type=='grid': 
@@ -19,7 +20,7 @@ class Observer:
             return {'grid':[size,size,3]} 
         elif self.obs_type == 'features' : 
             # shape = all agent positions + banana locations + my position + my id 
-            shape = self.env.n*2 + self.env.n*2 + self.env*2 + self.env.n 
+            shape = self.env.n*2 + self.env.n*2 + self.env.n*2 + self.env.n 
             if self.fights_info : 
                 shape +=2 
             return {'features':shape} 

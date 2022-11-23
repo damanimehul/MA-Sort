@@ -5,10 +5,10 @@ import random
 import matplotlib.pyplot as plt
 from PIL import Image
 from Observers import Observer
-from env_utils import Monkey,AgentMap
+from env_utils import Monkey,AgentMap,FightGraph
 
 class SortingEnv(gym.Env):
-    def __init__(self,n=4,random_init=True) :
+    def __init__(self,n=4,random_init=True,obs_type='features') :
         self.height = 5 
         self.n = n 
         if self.n%2!=0:
@@ -17,7 +17,8 @@ class SortingEnv(gym.Env):
         if n!=2 :
             self.width -=1  
         self.action_space = spaces.Discrete(5)
-        self.observation_space = spaces.Tuple((spaces.Discrete(self.height),spaces.Discrete(self.width))) 
+
+        #Fixed variables 
         self.moves = {0:[-1,0],1:[0,1],2:[1,0],3:[0,-1],4:[0,0]}  
         self.max_reward = n*2 
         self.min_reward = 2 
@@ -25,13 +26,19 @@ class SortingEnv(gym.Env):
         self.out_of_bounds_reward = -1 
         self.color_mapping = {1:[255,255,0],-1:[0,0,0],0:[255,255,255]} 
         self.agent_colors =  {1:[102,0,0],2:[204,0,0],3:[255,102,102],4:[0,102,102],5:[0,204,204],6:[102,255,255],7:[0,255,0],8:[155,253,155]}
+        self.fight_graph = FightGraph(self) 
+
+        # These might change
         self.random_init = random_init
-        self.observer = Observer(self,'both') 
+        self.observer = Observer(self,obs_type)  
+        self.observation_shape = self.observer.observation_shape 
         self.build_env() 
         self.reset() 
 
     def reset(self) : 
         self.fight_history = {} 
+        self.fight_graph.reset() 
+        self.fights,self.redundant_fights = 0,0 
         init_pos = self.agent_map.initialize_agents() 
         agent_ranks = [i for i in range(1,self.n+1)]
         #random.shuffle(agent_ranks) 
@@ -153,24 +160,28 @@ class SortingEnv(gym.Env):
                         else : 
                             #FIGHT 
                             if self.agents[agent_id].rank < self.agents[agent_flag].rank : 
-                                new_pos_dict[agent_id] = newpos 
+                                new_pos_dict[agent_id],new_pos_dict[agent_flag] = newpos , agent_pos 
                                 rewards_dict[agent_id] += self.banana_rewards[newpos] 
-                                new_pos_dict[agent_flag] = agent_pos 
-                                remove.append(agent_flag) 
-                                remove.append(agent_id)
+                                remove.extend([agent_flag,agent_id]) 
                                 self.fight_history[(agent_flag,agent_id)] = agent_id
                                 self.agent_map.swap([agent_id,agent_flag],[newpos,agent_pos]) 
-                                self.agents[agent_id].fight_update(1) 
-                                self.agents[agent_flag].fight_update(0)
+                                self.agents[agent_id].fight_update(1,agent_flag) 
+                                self.agents[agent_flag].fight_update(0,agent_id) 
+                                redundant = self.fight_graph.update(agent_id,agent_flag) 
+                                self.fights+=1 
+                                if redundant :
+                                    self.redundant_fights +=1 
                             else : 
-                                new_pos_dict[agent_id] = agent_pos 
-                                new_pos_dict[agent_flag] = newpos 
+                                new_pos_dict[agent_id],new_pos_dict[agent_flag] = agent_pos , newpos
                                 rewards_dict[agent_flag] += self.banana_rewards[newpos]  
-                                remove.append(agent_flag) 
-                                remove.append(agent_id)
+                                remove.extend([agent_flag,agent_id])
                                 self.fight_history[(agent_flag,agent_id)] = agent_flag
-                                self.agents[agent_id].fight_update(0) 
-                                self.agents[agent_flag].fight_update(1)
+                                self.agents[agent_id].fight_update(0,agent_flag) 
+                                self.agents[agent_flag].fight_update(1,agent_id)
+                                self.fights+=1 
+                                redundant = self.fight_graph.update(agent_flag,agent_id) 
+                                if redundant :
+                                    self.redundant_fights +=1 
                     else : 
                         # I tried to move into somewho who is also trying to move into someone, let's deal with this in final pass
                         pass   
@@ -249,28 +260,27 @@ class SortingEnv(gym.Env):
         return rgb_array
 
 if __name__=='__main__':
-    env = SortingEnv(4,False) 
+    env = SortingEnv(8,False) 
     map = env.reset()
-    print(map)
     array = env.render() 
-    plt.imshow(array) 
-    plt.show() 
-    plt.close() 
+    #plt.imshow(array) 
+    #plt.show() 
+    #plt.close() 
     break_flag = 0
-    for j in range(1): 
+    for j in range(1000): 
         imgs =[Image.fromarray(array)] 
         for _ in range(20) : 
             actions = {} 
-            a = str(input())
-            for i in range(1,5) : 
-                actions[i] = int(a[i-1])  #env.action_space.sample() #
+            #a = str(input())
+            for i in range(1,9) : 
+                actions[i] = env.action_space.sample() #int(a[i-1]) # #
            # try :
             o,r,_ = env.step(actions) 
-            print(o) 
+           # print(o) 
             array = env.render()
-            plt.imshow(array) 
-            plt.show()
-            plt.close() 
+            #plt.imshow(array) 
+            #plt.show()
+            #plt.close() 
             #except :
             #    break_flag = 1
             #    break 
