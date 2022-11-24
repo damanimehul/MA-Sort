@@ -55,7 +55,7 @@ class SortingEnv(gym.Env):
         for monkey in self.agents.values() : 
             monkey.update(new_positions[monkey.id],rewards[monkey.id]) 
         self.agent_map.set_agent_positions(new_positions)
-        return self.observer.get_obs(),rewards,0 
+        return self.observer.get_obs(),rewards,False, None 
 
     def add(self,pos,move) : 
         return (pos[0]+move[0],pos[1]+move[1])
