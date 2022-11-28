@@ -83,7 +83,7 @@ with open(path+"/config.json","w") as file :
     file.close() 
 
 with open(path+"/runner.sh","w") as file : 
-    file.write('mkdir /home/gridsan/mdamani/6.7950/slurm_jobs/{}\n'.format(args.name)) 
+    file.write('mkdir /home/gridsan/mdamani/6.7950-project/slurm_jobs/{}\n'.format(args.name)) 
     file.write('sbatch job.slurm ') 
     file.close() 
 
@@ -91,8 +91,8 @@ with open(path+"/job.slurm","w") as f :
     f.write('#!/bin/bash\n') 
     f.write('#SBATCH --job-name={}\n'.format(experiment_name)) 
     f.write('#SBATCH --open-mode=append\n') 
-    f.write('#SBATCH --output=/home/gridsan/mdamani/6.7950/slurm_jobs/{}/%x_%j.out\n'.format(args.name)) 
-    f.write('#SBATCH --error=/home/gridsan/mdamani/6.7950/slurm_jobs/{}/%x_%j.err\n'.format(args.name)) 
+    f.write('#SBATCH --output=/home/gridsan/mdamani/6.7950-project/slurm_jobs/{}/%x_%j.out\n'.format(args.name)) 
+    f.write('#SBATCH --error=/home/gridsan/mdamani/6.7950-project/slurm_jobs/{}/%x_%j.err\n'.format(args.name)) 
     f.write('#SBATCH --export=ALL\n') 
     f.write('#SBATCH --time=24:00:00\n')
     f.write('#SBATCH --mem=8G\n')
@@ -101,5 +101,5 @@ with open(path+"/job.slurm","w") as f :
     f.write('module purge\n')
     f.write('source ~/.bashrc\n') 
     f.write('module load anaconda/2021b\n') 
-    f.write('cd $HOME/6.7950\n')
+    f.write('cd $HOME/6.7950-project\n')
     f.write('python full_runner.py --path {}\n'.format(path)) 
