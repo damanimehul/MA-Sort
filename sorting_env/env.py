@@ -4,8 +4,8 @@ import numpy as np
 import random 
 import matplotlib.pyplot as plt
 from PIL import Image
-from Observers import Observer
-from env_utils import Monkey,AgentMap,FightGraph
+from sorting_env.Observers import Observer
+from sorting_env.env_utils import Monkey,AgentMap,FightGraph
 
 class SortingEnv(gym.Env):
     def __init__(self,n=4,random_init=True,obs_type='features') :

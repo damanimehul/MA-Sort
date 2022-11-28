@@ -5,8 +5,6 @@ import random
 import matplotlib.pyplot as plt
 from PIL import Image
 
-
-
 class Observer: 
     def __init__(self,env,obs_type='grid',fights_info=True) :
         self.env = env 
@@ -20,7 +18,7 @@ class Observer:
             return {'grid':[size,size,3]} 
         elif self.obs_type == 'features' : 
             # shape = all agent positions + banana locations + my position + my id 
-            shape = self.env.n*2 + self.env.n*2 + self.env.n*2 + self.env.n 
+            shape = self.env.n*2 + self.env.n*2 + 2 + self.env.n 
             if self.fights_info : 
                 shape +=2 
             return {'features':shape} 

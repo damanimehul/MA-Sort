@@ -1,10 +1,11 @@
-import torch as tf 
+import torch as th
 from torch.nn import functional as F
 from utils import * 
+from typing import Dict, Iterable, List, Optional, Tuple, Union 
 
 class A2C():
    
-    def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, device= "auto",multi_agent=True):
+    def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, device:Union[th.device, str] = "auto",multi_agent=True):
 
         self.policy = policy 
         self.env = env 
@@ -12,14 +13,14 @@ class A2C():
         self.gamma = gamma 
         self.gae_lambda = gae_lambda
         self.seed = seed 
-        self.device= device 
+        self.device= get_device(device)
         self.ent_coef = ent_coef 
         self.vf_coef = vf_coef 
         self.max_grad_norm = max_grad_norm
         self.seed = seed 
         self.num_iterations = num_iterations  
         self.multi_agent = multi_agent 
-        self.set_random_seed() 
+        self.set_random_seed(seed) 
         self.policy = self.policy.to(self.device)
  
     def set_random_seed(self, seed):
@@ -31,10 +32,7 @@ class A2C():
         if seed is None:
             return
         set_random_seed(seed, using_cuda=self.device.type == th.device("cuda").type)
-        self.action_space.seed(seed)
-        if self.env is not None:
-            self.env.seed(seed)
-             
+
     def train(self):
         """
         Update policy using the currently gathered
