@@ -3,7 +3,7 @@ from torch import nn
 from utils import * 
 
 
-class ActorCriticPolicy():
+class ActorCriticPolicy(nn.Module):
     """
     Policy class for actor-critic algorithms (has both policy and value prediction).
     Used by A2C, PPO and the likes.
@@ -35,6 +35,7 @@ class ActorCriticPolicy():
 
     def __init__(self,observation_space,action_space, lr=5e-4,net_arch= None,activation_fn = nn.ReLU,normalize_images = True, optimizer_class = th.optim.Adam,optimizer_kwargs = None,device:Union[th.device, str] = "auto"):
 
+        super(ActorCriticPolicy, self).__init__()
         if optimizer_kwargs is None:
             optimizer_kwargs = {}
             # Small values to avoid NaN in Adam optimizer
@@ -83,12 +84,10 @@ class ActorCriticPolicy():
             lr_schedule(1) is the initial learning rate
         """
         self._build_mlp_extractor()
-        print(self.mlp_extractor)
-
         pi = self.mlp_extractor.latent_dim_pi
         self.action_net = self.action_dist.proba_distribution_net(latent_dim=pi)
         self.value_net = nn.Linear(self.mlp_extractor.latent_dim_vf, 1) 
-        self.optimizer = self.optimizer_class(self.mlp_extractor.parameters(),lr=self.lr,**self.optimizer_kwargs)
+        self.optimizer = self.optimizer_class(self.parameters(),lr=self.lr,**self.optimizer_kwargs)
 
     def forward(self, obs: th.Tensor, deterministic: bool = False) -> Tuple[th.Tensor, th.Tensor, th.Tensor]:
         """

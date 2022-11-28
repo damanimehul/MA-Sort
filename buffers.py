@@ -2,7 +2,7 @@ import numpy as np
 
 class MultiAgentBuffer() : 
     # Wraps around single agent buffer 
-    def __init__(self,num_agents=4,buffer_size=100,action_dim=5,obs_dim=22,device= "auto",gae_lambda= 1,gamma=0.99) : 
+    def __init__(self,num_agents=4,buffer_size=100,action_dim=5,obs_dim=24,device= "auto",gae_lambda= 1,gamma=0.99) : 
         self.num_agents = num_agents 
 
         self.buffers = {id:RolloutBuffer(buffer_size,action_dim,obs_dim,device,gae_lambda,gamma) for id in range(1,self.num_agents+1)}
@@ -14,15 +14,15 @@ class MultiAgentBuffer() :
     
     def compute_returns_and_advantages(self,last_values) : 
         for id,buffer in self.buffers.items() : 
-            buffer.compute_returns_and_advantages(last_values[id]) 
+            buffer.compute_returns_and_advantage(last_values[id]) 
     
     def add(self,obs,action, reward, value,log_prob) :  
         for id,buffer in self.buffers.items() : 
             buffer.add(obs[id], action[id], reward[id],value[id], log_prob[id]) 
 
-    def get(self) : 
+    def sample_batch(self) : 
         random_agent = np.random.randint(1,self.num_agents+1) 
-        return self.buffers[random_agent].get() 
+        return self.buffers[random_agent].sample_batch() 
 
 class RolloutBuffer():
     def __init__(self,buffer_size=100,action_dim=5,obs_dim=22,device= "auto",gae_lambda= 1,gamma=0.99):
@@ -41,7 +41,7 @@ class RolloutBuffer():
     def reset(self) -> None:
         self.pos = 0 
         self.full = False 
-        self.observations = np.zeros((self.buffer_size) + self.obs_dim, dtype=np.float32)
+        self.observations = np.zeros((self.buffer_size,self.obs_dim), dtype=np.float32)
         self.actions = np.zeros((self.buffer_size, self.action_dim), dtype=np.float32)
         self.rewards = np.zeros((self.buffer_size), dtype=np.float32)
         self.returns = np.zeros((self.buffer_size), dtype=np.float32)
@@ -81,7 +81,6 @@ class RolloutBuffer():
         if len(log_prob.shape) == 0:
             # Reshape 0-d tensor to avoid error
             log_prob = log_prob.reshape(-1, 1)
-
         self.observations[self.pos] = np.array(obs).copy()
         self.actions[self.pos] = np.array(action).copy()
         self.rewards[self.pos] = np.array(reward).copy()
@@ -91,28 +90,11 @@ class RolloutBuffer():
         if self.pos == self.buffer_size:
             self.full = True
 
-    def get(self) : 
-        indices = np.random.permutation(self.buffer_size * self.n_envs)
-        # Prepare the data
-        if not self.generator_ready:
-
-            _tensor_names = [
-                "observations",
-                "actions",
-                "values",
-                "log_probs",
-                "advantages",
-                "returns",
-            ]
-
-            for tensor in _tensor_names:
-                self.__dict__[tensor] = self.swap_and_flatten(self.__dict__[tensor])
-            self.generator_ready = True
-
+    def sample_batch(self,batch_size=None) : 
+        indices = np.random.permutation(self.buffer_size)
         # Return everything, don't create minibatches
         if batch_size is None:
             batch_size = min(self.buffer_size,self.pos) 
-
         samples =  self._get_samples(indices[0 :batch_size])
         return samples 
 
@@ -126,3 +108,5 @@ class RolloutBuffer():
             returns=self.returns[batch_inds].flatten(),
         )
         return data 
+
+   

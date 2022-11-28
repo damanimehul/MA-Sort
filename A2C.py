@@ -5,7 +5,8 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 class A2C():
    
-    def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, device:Union[th.device, str] = "auto",multi_agent=True):
+    def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, 
+    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100):
 
         self.policy = policy 
         self.env = env 
@@ -20,6 +21,8 @@ class A2C():
         self.seed = seed 
         self.num_iterations = num_iterations  
         self.multi_agent = multi_agent 
+        self.max_ep_len = max_ep_len
+        self.num_agents = env.n
         self.set_random_seed(seed) 
         self.policy = self.policy.to(self.device)
  
@@ -44,6 +47,7 @@ class A2C():
         for _ in range(self.num_iterations) : 
             batch = self.buffer.sample_batch() 
             obs,actions,values, log_probs,advantages,returns = batch['obs'],batch['actions'],batch['values'],batch['log_probs'],batch['advantages'],batch['returns']
+            obs = obs_as_tensor(obs, self.device)
             values, log_prob, entropy = self.policy.forward(obs) 
             policy_loss = -(advantages * log_prob).mean() 
             value_loss = F.mse_loss(returns, values) 
@@ -84,14 +88,15 @@ class A2C():
         self.buffer.reset()
 
         while t < self.max_ep_len : 
-            actions,values,log_probs = {} , {} , {} 
+            actions,env_actions,values,log_probs = {}, {} , {} , {} 
             with th.no_grad():
                     for id in range(1,self.num_agents+1) : 
                 # Convert to pytorch tensor or to TensorDict
                         obs_tensor = obs_as_tensor(obs[id], self.device)
                         actions[id], values[id], log_probs[id] = self.policy(obs_tensor)
+                        env_actions[id] = int(actions[id])
                         actions[id] = actions[id].cpu().numpy()
-            new_obs, rewards, dones, infos = self.env.step(actions) 
+            new_obs, rewards, dones, infos = self.env.step(env_actions) 
             t+=1 
             self.buffer.add(obs, actions, rewards,values, log_probs)
 
@@ -99,9 +104,21 @@ class A2C():
         with th.no_grad():
             for id in range(1,self.num_agents+1) : 
                     obs_tensor = obs_as_tensor(new_obs[id], self.device)
-                    terminal_values[id] = self.policy.predict_values(new_obs)[0]
+                    terminal_values[id] = self.policy.predict_values(obs_tensor)[0]
            
-        self.buffer.compute_returns_and_advantage(last_values=terminal_values)
+        self.buffer.compute_returns_and_advantages(last_values=terminal_values)
     
         return True
 
+if __name__=='__main__' : 
+    from sorting_env.env  import SortingEnv
+    from policies import ActorCriticPolicy
+    from buffers import MultiAgentBuffer
+    env = SortingEnv() 
+    policy = ActorCriticPolicy(env.observation_shape,env.action_space) 
+    buffer = MultiAgentBuffer() 
+    algo = A2C(policy,env,buffer)
+    obs = env.reset() 
+    for _ in range(100) : 
+        algo.collect_multi_rollout() 
+        algo.train()
