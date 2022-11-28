@@ -1,10 +1,10 @@
 import numpy as np 
-
+from utils import * 
 class MultiAgentBuffer() : 
     # Wraps around single agent buffer 
-    def __init__(self,num_agents=4,buffer_size=100,action_dim=5,obs_dim=24,device= "auto",gae_lambda= 1,gamma=0.99) : 
+    def __init__(self,num_agents=4,buffer_size=100,action_dim=5,obs_dim=24,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99) : 
         self.num_agents = num_agents 
-
+        self.device= get_device(device)
         self.buffers = {id:RolloutBuffer(buffer_size,action_dim,obs_dim,device,gae_lambda,gamma) for id in range(1,self.num_agents+1)}
         self.reset() 
 
@@ -25,12 +25,12 @@ class MultiAgentBuffer() :
         return self.buffers[random_agent].sample_batch() 
 
 class RolloutBuffer():
-    def __init__(self,buffer_size=100,action_dim=5,obs_dim=22,device= "auto",gae_lambda= 1,gamma=0.99):
+    def __init__(self,buffer_size=100,action_dim=5,obs_dim=22,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99):
 
         self.buffer_size = buffer_size 
         self.action_dim = action_dim 
         self.obs_dim = obs_dim 
-        self.device = device 
+        self.device= get_device(device) 
         self.gae_lambda = gae_lambda
         self.gamma = gamma
         self.observations, self.actions, self.rewards, self.advantages = None, None, None, None
@@ -96,6 +96,8 @@ class RolloutBuffer():
         if batch_size is None:
             batch_size = min(self.buffer_size,self.pos) 
         samples =  self._get_samples(indices[0 :batch_size])
+        #for key in samples : 
+        #    samples[key] = obs_as_tensor(samples[key],self.device)
         return samples 
 
     def _get_samples(self, batch_inds):
@@ -104,8 +106,8 @@ class RolloutBuffer():
             actions=self.actions[batch_inds],
             values=self.values[batch_inds].flatten(),
             log_probs=self.log_probs[batch_inds].flatten(),
-            advantages=self.advantages[batch_inds].flatten(),
-            returns=self.returns[batch_inds].flatten(),
+            advantages=th.tensor(self.advantages[batch_inds].flatten()),
+            returns=th.tensor(self.returns[batch_inds].flatten()),
         )
         return data 
 

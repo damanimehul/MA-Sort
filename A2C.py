@@ -2,11 +2,12 @@ import torch as th
 from torch.nn import functional as F
 from utils import * 
 from typing import Dict, Iterable, List, Optional, Tuple, Union 
+from PIL import Image
 
 class A2C():
    
     def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, 
-    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100):
+    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100,save_gifs=False,gif_frequency=50,gif_path=None):
 
         self.policy = policy 
         self.env = env 
@@ -19,12 +20,18 @@ class A2C():
         self.vf_coef = vf_coef 
         self.max_grad_norm = max_grad_norm
         self.seed = seed 
-        self.num_iterations = num_iterations  
+        self.num_iterations = min(num_iterations,env.n)
         self.multi_agent = multi_agent 
         self.max_ep_len = max_ep_len
         self.num_agents = env.n
+        self.save_gifs = save_gifs 
+        self.gif_frequency = gif_frequency
         self.set_random_seed(seed) 
         self.policy = self.policy.to(self.device)
+        self.episode_num = 0 
+        self.gif_path = gif_path
+        if save_gifs : 
+            assert gif_path is not None 
  
     def set_random_seed(self, seed):
         """
@@ -41,9 +48,7 @@ class A2C():
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
-        # Update optimizer learning rate
-        # self._update_learning_rate(self.policy.optimizer)
-
+     
         for _ in range(self.num_iterations) : 
             batch = self.buffer.sample_batch() 
             obs,actions,values, log_probs,advantages,returns = batch['obs'],batch['actions'],batch['values'],batch['log_probs'],batch['advantages'],batch['returns']
@@ -58,11 +63,11 @@ class A2C():
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
        
-        self._n_updates += 1
-        self.logger.record("train/n_updates", self._n_updates, exclude="tensorboard")
-        self.logger.record("train/entropy_loss", entropy_loss.item())
-        self.logger.record("train/policy_loss", policy_loss.item())
-        self.logger.record("train/value_loss", value_loss.item()) 
+        train_stats = {} 
+        train_stats['Policy Loss'] = policy_loss.item() 
+        train_stats['Value Loss'] = value_loss.item() 
+        train_stats['Entropy Loss'] = entropy_loss.item() 
+        return train_stats
 
     def collect_rollout(self) : 
         if self.multi_agent : 
@@ -82,10 +87,26 @@ class A2C():
         :param n_rollout_steps: Number of experiences to collect per environment
         :return: True if function returned with at least `n_rollout_steps`
             collected, False if callback terminated rollout prematurely.
-        """
+        """ 
+
+        def combined_reward(rewards) : 
+            r = 0 
+            for k,v in rewards.items() : 
+                r +=v 
+            return r 
+
+        save_gif = False 
+        if self.save_gifs and self.episode_num%self.gif_frequency ==0 :
+            save_gif = True 
+
+        ep_ret = 0 
         obs = self.env.reset()
         t = 0
-        self.buffer.reset()
+        self.buffer.reset() 
+
+        if save_gif : 
+            array = self.env.render() 
+            imgs =[Image.fromarray(array)]  
 
         while t < self.max_ep_len : 
             actions,env_actions,values,log_probs = {}, {} , {} , {} 
@@ -97,6 +118,10 @@ class A2C():
                         env_actions[id] = int(actions[id])
                         actions[id] = actions[id].cpu().numpy()
             new_obs, rewards, dones, infos = self.env.step(env_actions) 
+            ep_ret += combined_reward(rewards)
+            if save_gif : 
+                array = self.env.render() 
+                imgs.append(Image.fromarray(array)) 
             t+=1 
             self.buffer.add(obs, actions, rewards,values, log_probs)
 
@@ -107,8 +132,14 @@ class A2C():
                     terminal_values[id] = self.policy.predict_values(obs_tensor)[0]
            
         self.buffer.compute_returns_and_advantages(last_values=terminal_values)
-    
-        return True
+        self.episode_num +=1 
+        if save_gif : 
+            imgs[0].save(self.gif_path+"{}.gif".format(self.episode_num), save_all=True, append_images=imgs[1:], duration=10, loop=0)
+
+        stats = self.env.get_stats() 
+        stats['Returns'] = ep_ret
+        stats['Episodes'] = self.episode_num
+        return stats 
 
 if __name__=='__main__' : 
     from sorting_env.env  import SortingEnv

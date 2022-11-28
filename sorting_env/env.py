@@ -8,7 +8,7 @@ from sorting_env.Observers import Observer
 from sorting_env.env_utils import Monkey,AgentMap,FightGraph
 
 class SortingEnv(gym.Env):
-    def __init__(self,n=4,random_init=True,obs_type='features') :
+    def __init__(self,n=4,random_init=True,obs_type='features',fights_info=True,shuffle_ranks=True) :
         self.height = 5 
         self.n = n 
         if self.n%2!=0:
@@ -24,24 +24,29 @@ class SortingEnv(gym.Env):
         self.min_reward = 2 
         self.invalid_move_reward = -1
         self.out_of_bounds_reward = -1 
+
+        # For rendering 
         self.color_mapping = {1:[255,255,0],-1:[0,0,0],0:[255,255,255]} 
         self.agent_colors =  {1:[102,0,0],2:[204,0,0],3:[255,102,102],4:[0,102,102],5:[0,204,204],6:[102,255,255],7:[0,255,0],8:[155,253,155]}
         self.fight_graph = FightGraph(self) 
 
         # These might change
         self.random_init = random_init
-        self.observer = Observer(self,obs_type)  
+        self.observer = Observer(self,obs_type,fights_info=fights_info)  
         self.observation_shape = self.observer.observation_shape 
+        self.shuffle_ranks = shuffle_ranks
         self.build_env() 
         self.reset() 
 
     def reset(self) : 
         self.fight_history = {} 
         self.fight_graph.reset() 
+        self.solved = False 
         self.fights,self.redundant_fights = 0,0 
         init_pos = self.agent_map.initialize_agents() 
         agent_ranks = [i for i in range(1,self.n+1)]
-        #random.shuffle(agent_ranks) 
+        if self.shuffle_ranks : 
+            random.shuffle(agent_ranks) 
         self.agent_ranks = {i:agent_ranks[i-1] for i in range(1,self.n+1) }
         self.agents ={}
         self.agent_color_mapping = {}  
@@ -50,11 +55,22 @@ class SortingEnv(gym.Env):
             self.agent_color_mapping[i] = self.agent_colors[agent_ranks[i-1]]
         return self.observer.get_obs() 
 
+    def get_stats(self) : 
+        stat_dict = {}
+        stat_dict['Fights'] = self.fights 
+        stat_dict['Redundant Fights'] = self.redundant_fights 
+        stat_dict['Solved'] = int(self.solved) 
+        for id in range(1,self.n+1) : 
+            stat_dict['Agent {} returns'.format(id)] = sum(self.agents[id].reward_history)
+        return stat_dict 
+
     def step(self,actions) : 
         new_positions, rewards = self.collision_check(actions) 
         for monkey in self.agents.values() : 
             monkey.update(new_positions[monkey.id],rewards[monkey.id]) 
         self.agent_map.set_agent_positions(new_positions)
+        if not self.solved : 
+            self.solved = self.check_solved(new_positions)
         return self.observer.get_obs(),rewards,False, None 
 
     def add(self,pos,move) : 
@@ -70,19 +86,33 @@ class SortingEnv(gym.Env):
                 if i not in self.banana_locations:
                     self.world_map[j][i] = -1 
                 else :
-                    self.world_map[j][i] = 1   
+                    self.world_map[j][i] = 1  
 
         current_reward = self.max_reward 
+        reward_to_pos = {} 
         for i in self.banana_locations : 
             for j in [0,self.height-1] :
                 self.banana_rewards[(j,i)] = current_reward 
+                reward_to_pos[current_reward] = (j,i)
                 current_reward-=self.min_reward 
+                
+        self.optimal_rank_pos = {} 
+        for i in range(0,self.n) : 
+            opt_reward = self.max_reward - i*self.min_reward  
+            self.optimal_rank_pos[i+1] = reward_to_pos[opt_reward]
         
     def get_width(self,n) :
         if n==2 : 
             return 2 
         else :
-            return 3 + self.get_width(n-2)
+            return 3 + self.get_width(n-2) 
+
+    def check_solved(self,new_pos) : 
+        for agent_id,pos in new_pos.items() : 
+            rank  = self.agents[agent_id].rank 
+            if not self.optimal_rank_pos[rank] == pos  : 
+                return False 
+        return True 
 
     def invalid_action(self,pos,action) : 
         # Only checking for out of bounds or into other obstacles
@@ -93,7 +123,8 @@ class SortingEnv(gym.Env):
         return False 
 
     def collision_check(self,actions) :         
-        new_pos_dict,rewards_dict,not_set ={},{},[] 
+        new_pos_dict,rewards_dict,not_set = {},{},[] 
+        fights= [] 
         for id in range(1,self.n+1) : 
             rewards_dict[id] = 0 
         for agent_id in range(1,self.n+1) : 
@@ -126,67 +157,75 @@ class SortingEnv(gym.Env):
                 print('Which case is this 1!?') 
 
         remove =[] 
-
         if len(not_set)!=0 :
             for agent_id in not_set : 
-                agent_pos = self.agents[agent_id].pos 
-                agent_move = self.moves[actions[agent_id]] 
-                newpos = self.add(agent_pos,agent_move)  
-                # This means I am at a reward state and took an invalid action, cannot say anything about my next position as I might be displaced, but will definitely receive an invalid action reward 
-                if self.invalid_action(agent_pos,actions[agent_id]) : 
-                    rewards_dict[agent_id] += self.invalid_move_reward
-                    # I might have been displaced, if I haven't been displaced yet, set the current position to stay (displacing will overwrite this)
-                    if agent_id not in new_pos_dict :
-                        new_pos_dict[agent_id] = agent_pos 
-                        remove.append(agent_id)
-                    continue 
-                # Easy to check valid move (In case the agent it was trying to move into changed positions)
-                elif self.agent_map.query(newpos) == 0 : 
-                    new_pos_dict[agent_id] = newpos 
-                    rewards_dict[agent_id] = 0 
-                    if newpos in self.banana_rewards  : 
-                        rewards_dict[agent_id] = self.banana_rewards[newpos] 
-                    self.agent_map.update(agent_id,newpos,agent_pos)
-                    remove.append(agent_id)
-                # Trying to move into another agent 
-                elif self.agent_map.query(newpos) != 0 : 
-                    agent_flag= self.agent_map.query(newpos)
-                    # That agent wants to/ will stay at its current position 
-                    if actions[agent_flag] ==0 or self.invalid_action(newpos,actions[agent_flag]) :
-                        if newpos not in self.banana_rewards : 
+                if agent_id not in remove : 
+                    agent_pos = self.agents[agent_id].pos 
+                    agent_move = self.moves[actions[agent_id]] 
+                    newpos = self.add(agent_pos,agent_move)  
+                    # This means I am at a reward state and took an invalid action, cannot say anything about my next position as I might be displaced, but will definitely receive an invalid action reward 
+                    if self.invalid_action(agent_pos,actions[agent_id]) : 
+                        rewards_dict[agent_id] += self.invalid_move_reward
+                        # I might have been displaced, if I haven't been displaced yet, set the current position to stay (displacing will overwrite this)
+                        if agent_id not in new_pos_dict :
                             new_pos_dict[agent_id] = agent_pos 
-                            rewards_dict[agent_id] = 0  
                             remove.append(agent_id)
-                        else : 
-                            #FIGHT 
-                            if self.agents[agent_id].rank < self.agents[agent_flag].rank : 
-                                new_pos_dict[agent_id],new_pos_dict[agent_flag] = newpos , agent_pos 
-                                rewards_dict[agent_id] += self.banana_rewards[newpos] 
-                                remove.extend([agent_flag,agent_id]) 
-                                self.fight_history[(agent_flag,agent_id)] = agent_id
-                                self.agent_map.swap([agent_id,agent_flag],[newpos,agent_pos]) 
-                                self.agents[agent_id].fight_update(1,agent_flag) 
-                                self.agents[agent_flag].fight_update(0,agent_id) 
-                                redundant = self.fight_graph.update(agent_id,agent_flag) 
-                                self.fights+=1 
-                                if redundant :
-                                    self.redundant_fights +=1 
+                        continue 
+                    # Easy to check valid move (In case the agent it was trying to move into changed positions)
+                    elif self.agent_map.query(newpos) == 0 : 
+                        new_pos_dict[agent_id] = newpos 
+                        rewards_dict[agent_id] = 0 
+                        if newpos in self.banana_rewards  : 
+                            rewards_dict[agent_id] = self.banana_rewards[newpos] 
+                        self.agent_map.update(agent_id,newpos,agent_pos)
+                        remove.append(agent_id)
+                    # Trying to move into another agent 
+                    elif self.agent_map.query(newpos) != 0 : 
+                        agent_flag= self.agent_map.query(newpos)
+                        # That agent wants to/ will stay at its current position 
+                        if actions[agent_flag] == 4 or self.invalid_action(newpos,actions[agent_flag]) or newpos in self.banana_rewards :
+                            if newpos not in self.banana_rewards : 
+                                new_pos_dict[agent_id] = agent_pos 
+                                rewards_dict[agent_id] = 0  
+                                remove.append(agent_id)
                             else : 
-                                new_pos_dict[agent_id],new_pos_dict[agent_flag] = agent_pos , newpos
-                                rewards_dict[agent_flag] += self.banana_rewards[newpos]  
-                                remove.extend([agent_flag,agent_id])
-                                self.fight_history[(agent_flag,agent_id)] = agent_flag
-                                self.agents[agent_id].fight_update(0,agent_flag) 
-                                self.agents[agent_flag].fight_update(1,agent_id)
-                                self.fights+=1 
-                                redundant = self.fight_graph.update(agent_flag,agent_id) 
-                                if redundant :
-                                    self.redundant_fights +=1 
-                    else : 
-                        # I tried to move into somewho who is also trying to move into someone, let's deal with this in final pass
-                        pass   
-                else :
-                    print('Which case is this 2!?') 
+                                #FIGHT 
+                                if self.agents[agent_id].rank < self.agents[agent_flag].rank :  
+                                    f, rev_f = [agent_flag,agent_id] , [agent_id,agent_flag] 
+                                    if f not in fights and rev_f not in fights: 
+                                        new_pos_dict[agent_id] = newpos 
+                                        new_pos_dict[agent_flag] =  agent_pos 
+                                        rewards_dict[agent_id] += self.banana_rewards[newpos] 
+                                        remove.extend([agent_flag,agent_id]) 
+                                        self.fight_history[(agent_flag,agent_id)] = agent_id
+                                        self.agent_map.swap([agent_id,agent_flag],[newpos,agent_pos]) 
+                                        self.agents[agent_id].fight_update(1,agent_flag) 
+                                        self.agents[agent_flag].fight_update(0,agent_id) 
+                                        redundant = self.fight_graph.update(agent_id,agent_flag) 
+                                        self.fights+=1 
+                                        if redundant :
+                                            self.redundant_fights +=1 
+                                        fights.append(f) 
+                                else : 
+                                    f, rev_f = [agent_flag,agent_id] , [agent_id,agent_flag] 
+                                    if f not in fights and rev_f not in fights: 
+                                        new_pos_dict[agent_id] = agent_pos
+                                        new_pos_dict[agent_flag] =  newpos
+                                        rewards_dict[agent_flag] += self.banana_rewards[newpos]  
+                                        remove.extend([agent_flag,agent_id])
+                                        self.fight_history[(agent_flag,agent_id)] = agent_flag
+                                        self.agents[agent_id].fight_update(0,agent_flag) 
+                                        self.agents[agent_flag].fight_update(1,agent_id)
+                                        self.fights+=1 
+                                        redundant = self.fight_graph.update(agent_flag,agent_id) 
+                                        if redundant :
+                                            self.redundant_fights +=1 
+                                        fights.append(f) 
+                        else : 
+                            # I tried to move into somewho who is also trying to move into someone, let's deal with this in final pass
+                            pass   
+                    else :
+                        print('Which case is this 2!?') 
 
         remove = list(set(remove))
         for id in remove : 
@@ -259,33 +298,36 @@ class SortingEnv(gym.Env):
 
         return rgb_array
 
-if __name__=='__main__':
-    env = SortingEnv(8,False) 
+if __name__=='__main__': 
+    import Observers 
+    import env_utils
+    env = SortingEnv(4,False) 
     map = env.reset()
     array = env.render() 
-    #plt.imshow(array) 
-    #plt.show() 
-    #plt.close() 
+    plt.imshow(array) 
+    plt.show() 
+    plt.close() 
     break_flag = 0
     for j in range(1000): 
         imgs =[Image.fromarray(array)] 
         for _ in range(20) : 
             actions = {} 
-            #a = str(input())
-            for i in range(1,9) : 
-                actions[i] = env.action_space.sample() #int(a[i-1]) # #
+            a = str(input())
+            for i in range(1,5) : 
+                actions[i] = int(a[i-1]) # env.action_space.sample()  # int(a[i-1])#
            # try :
-            o,r,_ = env.step(actions) 
+            o,r,_,_ = env.step(actions) 
+            print(r) 
            # print(o) 
             array = env.render()
-            #plt.imshow(array) 
-            #plt.show()
-            #plt.close() 
+            plt.imshow(array) 
+            plt.show()
+            plt.close() 
             #except :
             #    break_flag = 1
             #    break 
-            imgs.append(Image.fromarray(array))
-        print(j) 
+            imgs.append(Image.fromarray(array)) 
+        print(j)
         imgs[0].save("array2.gif", save_all=True, append_images=imgs[1:], duration=10, loop=0)
         if break_flag :
             break 
