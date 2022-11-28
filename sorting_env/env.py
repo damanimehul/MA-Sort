@@ -266,6 +266,11 @@ class SortingEnv(gym.Env):
             if tuple(new_pos_dict[id]) in self.banana_rewards and r<=0 :
                 rewards_dict[id]+= self.banana_rewards[tuple(new_pos_dict[id])]
 
+        #Bounding rewards as they are assigned wrongly at certain timesteps 
+        for id,r in rewards_dict.items() :
+            if tuple(new_pos_dict[id]) in self.banana_rewards and r> self.max_reward :
+                rewards_dict[id]= int(rewards_dict[id]/2)
+
         assert len(not_set) ==0 
         return new_pos_dict,rewards_dict
 
