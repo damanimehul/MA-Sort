@@ -4,7 +4,7 @@
 #SBATCH --output=/home/gridsan/mdamani/6.7950-project/slurm_jobs/twoagents-v3/%x_%j.out
 #SBATCH --error=/home/gridsan/mdamani/6.7950-project/slurm_jobs/twoagents-v3/%x_%j.err
 #SBATCH --export=ALL
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mem=8G
 #SBATCH -c 1
 #SBATCH -N 1

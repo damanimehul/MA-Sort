@@ -49,7 +49,7 @@ class Logger:
                 hyperparameter configuration with multiple random seeds, you
                 should give them all the same ``exp_name``.)
         """
-        self.output_dir = args.output_dir 
+        self.output_dir = args.output_dir + time.strftime("_%Y-%m-%d") 
         if osp.exists(self.output_dir):
             print("Warning: Log dir %s already exists! Storing info there anyway."%self.output_dir)
             self.gif_directory = self.output_dir +'/gifs/'

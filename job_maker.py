@@ -94,7 +94,7 @@ with open(path+"/job.slurm","w") as f :
     f.write('#SBATCH --output=/home/gridsan/mdamani/6.7950-project/slurm_jobs/{}/%x_%j.out\n'.format(args.name)) 
     f.write('#SBATCH --error=/home/gridsan/mdamani/6.7950-project/slurm_jobs/{}/%x_%j.err\n'.format(args.name)) 
     f.write('#SBATCH --export=ALL\n') 
-    f.write('#SBATCH --time=24:00:00\n')
+    f.write('#SBATCH --time=12:00:00\n')
     f.write('#SBATCH --mem=8G\n')
     f.write('#SBATCH -c 1\n') 
     f.write('#SBATCH -N 1\n') 

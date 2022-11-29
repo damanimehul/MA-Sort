@@ -1,1 +1,1 @@
-"{\"0\": \" --exp_name twoagents-v3--save_gifs --wandb --max_ep_len 50 --lr 1e-6 --shuffle_ranks 0 --n 2 --gif_frequency 1000 --train_episodes 50000 --v_coeff 0.01 --gamma 0.9 \"}"
+"{\"0\": \" --exp_name twoagents-v3 --save_gifs --wandb --max_ep_len 50 --lr 1e-4  --n 2 --gif_frequency 500 --train_episodes 20000 --v_coeff 0.01 \"}"
