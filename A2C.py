@@ -53,7 +53,7 @@ class A2C():
             batch = self.buffer.sample_batch() 
             obs,actions,values, log_probs,advantages,returns = batch['obs'],batch['actions'],batch['values'],batch['log_probs'],batch['advantages'],batch['returns']
             obs = obs_as_tensor(obs, self.device)
-            values, log_prob, entropy = self.policy.forward(obs) 
+            values, log_prob, entropy = self.policy.evaluate_actions(obs,actions) 
             policy_loss = -(advantages * log_prob).mean() 
             value_loss = F.mse_loss(returns, values) 
             entropy_loss = -th.mean(entropy)
@@ -124,6 +124,7 @@ class A2C():
                 imgs.append(Image.fromarray(array)) 
             t+=1 
             self.buffer.add(obs, actions, rewards,values, log_probs)
+            obs = new_obs
 
         terminal_values = {} 
         with th.no_grad():

@@ -42,7 +42,7 @@ class RolloutBuffer():
         self.pos = 0 
         self.full = False 
         self.observations = np.zeros((self.buffer_size,self.obs_dim), dtype=np.float32)
-        self.actions = np.zeros((self.buffer_size, self.action_dim), dtype=np.float32)
+        self.actions = np.zeros((self.buffer_size), dtype=np.float32)
         self.rewards = np.zeros((self.buffer_size), dtype=np.float32)
         self.returns = np.zeros((self.buffer_size), dtype=np.float32)
         self.values = np.zeros((self.buffer_size), dtype=np.float32)
@@ -103,7 +103,7 @@ class RolloutBuffer():
     def _get_samples(self, batch_inds):
         data = dict(
             obs=self.observations[batch_inds],
-            actions=self.actions[batch_inds],
+            actions=th.tensor(self.actions[batch_inds]),
             values=self.values[batch_inds].flatten(),
             log_probs=self.log_probs[batch_inds].flatten(),
             advantages=th.tensor(self.advantages[batch_inds].flatten()),

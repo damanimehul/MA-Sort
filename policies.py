@@ -5,7 +5,8 @@ from utils import *
 
 class ActorCriticPolicy(nn.Module):
 
-    def __init__(self,observation_space,action_space, lr=5e-4,net_arch= [128,128],activation_fn = nn.ReLU,optimizer_class = th.optim.Adam,optimizer_kwargs = None,device:Union[th.device, str] = "auto"):
+    def __init__(self,observation_space,action_space, lr=5e-4,net_arch= [128,128],activation_fn = nn.ReLU,optimizer_class = th.optim.Adam,
+    optimizer_kwargs = None,device:Union[th.device, str] = "auto"):
 
         super(ActorCriticPolicy, self).__init__()
         if optimizer_kwargs is None:
