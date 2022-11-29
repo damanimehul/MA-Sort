@@ -150,6 +150,10 @@ class SortingEnv(gym.Env):
                 else : 
                     rewards_dict[agent_id] = 0 
                 self.agent_map.update(agent_id,newpos,agent_pos)
+            # Stopped at current position which is not a banana position
+            elif actions[agent_id] ==4 :
+                new_pos_dict[agent_id] = newpos 
+                rewards_dict[agent_id] = 0 
             # Trying to move into another agent 
             elif self.agent_map.query(newpos) != 0 : 
                 not_set.append(agent_id)  
@@ -182,8 +186,16 @@ class SortingEnv(gym.Env):
                     # Trying to move into another agent 
                     elif self.agent_map.query(newpos) != 0 : 
                         agent_flag= self.agent_map.query(newpos)
+                        # I was staying stopped, might be displaced so check for that
+                        if actions[agent_id] == 4:
+                            if agent_id not in new_pos_dict :
+                                new_pos_dict[agent_id] = agent_pos 
+                                rewards_dict[agent_id] = self.banana_rewards[newpos] 
+                                remove.append(agent_id)
+                                continue 
+
                         # That agent wants to/ will stay at its current position 
-                        if actions[agent_flag] == 4 or self.invalid_action(newpos,actions[agent_flag]) or newpos in self.banana_rewards :
+                        elif actions[agent_flag] == 4 or self.invalid_action(newpos,actions[agent_flag]) or newpos in self.banana_rewards :
                             if newpos not in self.banana_rewards : 
                                 new_pos_dict[agent_id] = agent_pos 
                                 rewards_dict[agent_id] = 0  
@@ -196,6 +208,7 @@ class SortingEnv(gym.Env):
                                         new_pos_dict[agent_id] = newpos 
                                         new_pos_dict[agent_flag] =  agent_pos 
                                         rewards_dict[agent_id] += self.banana_rewards[newpos] 
+                                        rewards_dict[agent_flag] = 0 
                                         remove.extend([agent_flag,agent_id]) 
                                         self.fight_history[(agent_flag,agent_id)] = agent_id
                                         self.agent_map.swap([agent_id,agent_flag],[newpos,agent_pos]) 
@@ -211,7 +224,8 @@ class SortingEnv(gym.Env):
                                     if f not in fights and rev_f not in fights: 
                                         new_pos_dict[agent_id] = agent_pos
                                         new_pos_dict[agent_flag] =  newpos
-                                        rewards_dict[agent_flag] += self.banana_rewards[newpos]  
+                                        rewards_dict[agent_flag] += self.banana_rewards[newpos]
+                                        rewards_dict[agent_id] = 0 
                                         remove.extend([agent_flag,agent_id])
                                         self.fight_history[(agent_flag,agent_id)] = agent_flag
                                         self.agents[agent_id].fight_update(0,agent_flag) 
@@ -309,25 +323,29 @@ if __name__=='__main__':
     env = SortingEnv(4,False) 
     map = env.reset()
     array = env.render() 
-    plt.imshow(array) 
-    plt.show() 
-    plt.close() 
+   # plt.imshow(array) 
+   # plt.show() 
+   # plt.close() 
     break_flag = 0
     for j in range(1000): 
         imgs =[Image.fromarray(array)] 
         for _ in range(20) : 
             actions = {} 
-            a = str(input())
+            #a = str(input())
             for i in range(1,5) : 
-                actions[i] = int(a[i-1]) # env.action_space.sample()  # int(a[i-1])#
-           # try :
-            o,r,_,_ = env.step(actions) 
-            print(r) 
+                actions[i] =  env.action_space.sample()  # int(a[i-1])#
+            try :
+                print(actions)
+                o,r,_,_ = env.step(actions) 
+            except :
+                break_flag = 1 
+                break
+            #print(r) 
            # print(o) 
             array = env.render()
-            plt.imshow(array) 
-            plt.show()
-            plt.close() 
+            #plt.imshow(array) 
+            #plt.show()
+            #plt.close() 
             #except :
             #    break_flag = 1
             #    break 
