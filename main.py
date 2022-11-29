@@ -19,6 +19,7 @@ if __name__ =='__main__' :
     parser.add_argument('--hidden_sizes',type=list,default=[128,128],help='Hidden dizes for the shared actor critic network')
     parser.add_argument('--fights_info',type=int,default=1,help='Whether or not to provide information about total fights and fights won if using feature based obs ')
     parser.add_argument('--shuffle_ranks',type=int,default=1,help='If no shuffling, then the id of the agent already provides information about the optimal index, using this as a baseline to validate the learning algo ')
+    parser.add_argument('--v_coeff',type=float,default=0.1,help='Coefficient for value loss')
     args = parser.parse_args()  
 
     args.output_dir = 'results/{}'.format(args.exp_name)

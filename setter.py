@@ -14,8 +14,9 @@ def set_algo(args,policy,buffer,env,logger) :
     save_gifs = args.save_gifs
     gif_frequency = args.gif_frequency  
     gif_path = logger.gif_directory 
+    v_coeff = args.v_coeff
     return A2C(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
-    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path)
+    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff)
 
 def set_buffer(args,env) :  
     if not args.single_agent : 
