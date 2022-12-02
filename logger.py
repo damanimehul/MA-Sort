@@ -225,7 +225,7 @@ class Wandb_Logger() :
         self.wandb_run = None 
         if args.wandb: 
             name = args.exp_name + time.strftime("_%Y-%m-%d") 
-           # os.environ["WANDB_MODE"] = "offline" 
+            os.environ["WANDB_MODE"] = "offline" 
             self.wandb_run = wandb.init(project='6.7950',config=args,tags=[args.exp_name],name=name,settings=wandb.Settings(start_method="fork",_disable_stats=True))  
         if self.wandb_run is None :
             self.update = False 
