@@ -48,7 +48,8 @@ class A2C():
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
-     
+
+        p_loss, v_loss, e_loss = [],[],[]
         for _ in range(self.num_iterations) : 
             batch = self.buffer.sample_batch() 
             obs,actions,values, log_probs,advantages,returns = batch['obs'],batch['actions'],batch['values'],batch['log_probs'],batch['advantages'],batch['returns']
@@ -62,11 +63,16 @@ class A2C():
             loss.backward()
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
             self.policy.optimizer.step()
+            
+            # Append losses
+            p_loss.append(policy_loss.item()) 
+            v_loss.append(value_loss.item()) 
+            e_loss.append(entropy_loss.item())
        
         train_stats = {} 
-        train_stats['Policy Loss'] = policy_loss.item() 
-        train_stats['Value Loss'] = value_loss.item() 
-        train_stats['Entropy Loss'] = entropy_loss.item() 
+        train_stats['Policy Loss'] = np.mean(p_loss)
+        train_stats['Value Loss'] = np.mean(v_loss) 
+        train_stats['Entropy Loss'] = np.mean(e_loss)
         return train_stats
 
     def collect_rollout(self) : 
@@ -139,8 +145,14 @@ class A2C():
 
         stats = self.env.get_stats() 
         stats['Returns'] = ep_ret
-        stats['Episodes'] = self.episode_num
-        return stats 
+        stats['Episodes'] = self.episode_num 
+        return stats
+
+    def get_img_stats(self) : 
+        im_stats = {} 
+        for id in [1,self.num_agents] : 
+            im_stats['Agent {} Value Map'.format(id)] = self.env.get_v_map(self.policy,self.device,id) 
+        return im_stats
 
 if __name__=='__main__' : 
     from sorting_env.env  import SortingEnv

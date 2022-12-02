@@ -6,9 +6,13 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from sorting_env.Observers import Observer
 from sorting_env.env_utils import Monkey,AgentMap,FightGraph
+from utils import * 
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 class SortingEnv(gym.Env):
-    def __init__(self,n=4,random_init=True,obs_type='features',fights_info=True,shuffle_ranks=True) :
+    def __init__(self,n=4,random_init=False,obs_type='features',fights_info=True,shuffle_ranks=True) :
         self.height = 5 
         self.n = n 
         if self.n%2!=0:
@@ -22,8 +26,12 @@ class SortingEnv(gym.Env):
         self.moves = {0:[-1,0],1:[0,1],2:[1,0],3:[0,-1],4:[0,0]}  
         self.max_reward = n*2 
         self.min_reward = 2 
-        self.invalid_move_reward = -1
-        self.out_of_bounds_reward = -1 
+        self.invalid_move_reward = -1 / self.max_reward
+        self.out_of_bounds_reward = -1 / self.max_reward
+
+        print('Fights Info:' , fights_info)
+        print('Shuffle Ranks:',shuffle_ranks) 
+        print('Random Init',random_init)
 
         # For rendering 
         self.color_mapping = {1:[255,255,0],-1:[0,0,0],0:[255,255,255]} 
@@ -43,6 +51,7 @@ class SortingEnv(gym.Env):
         self.fight_graph.reset() 
         self.solved = False 
         self.fights,self.redundant_fights = 0,0 
+        self.invalid_actions = 0 
         init_pos = self.agent_map.initialize_agents() 
         agent_ranks = [i for i in range(1,self.n+1)]
         if self.shuffle_ranks : 
@@ -59,7 +68,9 @@ class SortingEnv(gym.Env):
         stat_dict = {}
         stat_dict['Fights'] = self.fights 
         stat_dict['Redundant Fights'] = self.redundant_fights 
-        stat_dict['Solved'] = int(self.solved) 
+        stat_dict['Solved'] = int(self.solved) *100 
+        stat_dict['Invalid Actions'] = self.invalid_actions / self.n  
+
         for id in range(1,self.n+1) : 
             stat_dict['Agent {} returns'.format(id)] = sum(self.agents[id].reward_history)
         return stat_dict 
@@ -92,15 +103,15 @@ class SortingEnv(gym.Env):
         reward_to_pos = {} 
         for i in self.banana_locations : 
             for j in [0,self.height-1] :
-                self.banana_rewards[(j,i)] = current_reward 
-                reward_to_pos[current_reward] = (j,i)
+                self.banana_rewards[(j,i)] = current_reward / self.max_reward
+                reward_to_pos[current_reward/self.max_reward] = (j,i)
                 current_reward-=self.min_reward 
                 
         self.optimal_rank_pos = {} 
         for i in range(0,self.n) : 
-            opt_reward = self.max_reward - i*self.min_reward  
+            opt_reward = (self.max_reward - i*self.min_reward )/self.max_reward
             self.optimal_rank_pos[i+1] = reward_to_pos[opt_reward]
-        
+       
     def get_width(self,n) :
         if n==2 : 
             return 2 
@@ -137,11 +148,13 @@ class SortingEnv(gym.Env):
             #Out of Bounds Move 
             elif newpos[0] <0 or newpos[0] == self.height or newpos[1] <0 or newpos[1] == self.width :
                 new_pos_dict[agent_id] = agent_pos 
-                rewards_dict[agent_id] = self.out_of_bounds_reward 
+                rewards_dict[agent_id] = self.out_of_bounds_reward  
+                self.invalid_actions +=1 
             # Into Obstacles
             elif self.world_map[newpos[0]][newpos[1]] == -1 : 
                 new_pos_dict[agent_id] = agent_pos 
                 rewards_dict[agent_id] = self.invalid_move_reward 
+                self.invalid_actions +=1 
             # Easy to check valid move
             elif self.agent_map.query(newpos) == 0 : 
                 new_pos_dict[agent_id] = newpos 
@@ -288,6 +301,29 @@ class SortingEnv(gym.Env):
         assert len(not_set) ==0 
         return new_pos_dict,rewards_dict
 
+    def get_v_map(self,policy,device,agent_id=1) : 
+        v_map = np.ones((self.height,self.width)) * 10000
+        v_vals= [] 
+        for i in range(self.height) : 
+            for j in range(self.width) : 
+                if self.world_map[i][j] !=-1 : 
+                    pos =[i,j] 
+                    obs = self.observer.fixed_feature_obs(pos,agent_id) 
+                    obs_tensor = obs_as_tensor(obs[agent_id], device)
+                    v = policy.predict_values(obs_tensor)[0]
+                    v_map[i][j] = v.item() 
+                    v_vals.append(v.item())
+
+        v_min = np.min(v_vals) 
+        for i in range(self.height) : 
+            for j in range(self.width) : 
+                if v_map[i][j] == 10000: 
+                    v_map[i][j] = v_min 
+
+        plot = sns.heatmap(v_map,linewidth=0.5)
+        plt.close() 
+        return plot 
+     
     def render(self, mode="rgb_array"):
         if mode != "rgb_array":
             raise NotImplementedError()
@@ -315,6 +351,11 @@ class SortingEnv(gym.Env):
             rgb_array[:, j * 32] = 0
             rgb_array[:, (j + 1) * 32 - 1] = 0
 
+        # Adding this noise because gif rendering compresses identical frames which reduces episode lengths
+        noise = np.zeros((board_h * 32, board_w * 32, 3), np.uint8)  
+        noise[0][0][0] += np.random.randint(0,100,dtype=np.uint8)
+        rgb_array += noise 
+
         return rgb_array
 
 if __name__=='__main__': 
@@ -327,13 +368,13 @@ if __name__=='__main__':
    # plt.show() 
    # plt.close() 
     break_flag = 0
-    for j in range(1000): 
+    for j in range(1): 
         imgs =[Image.fromarray(array)] 
         for _ in range(20) : 
             actions = {} 
-            #a = str(input())
+            a = '4444'
             for i in range(1,5) : 
-                actions[i] =  env.action_space.sample()  # int(a[i-1])#
+                actions[i] = int(a[i-1])  #env.action_space.sample()  # int(a[i-1])#
             try :
                 print(actions)
                 o,r,_,_ = env.step(actions) 
@@ -343,6 +384,7 @@ if __name__=='__main__':
             #print(r) 
            # print(o) 
             array = env.render()
+            
             #plt.imshow(array) 
             #plt.show()
             #plt.close() 

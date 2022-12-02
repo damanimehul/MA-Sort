@@ -26,6 +26,31 @@ def colorize(string, color, bold=False, highlight=False):
     if bold: attr.append('1')
     return '\x1b[%sm%s\x1b[0m' % (';'.join(attr), string)
 
+def mpi_statistics_scalar(x, with_min_and_max=False):
+    """
+    Get mean/std and optional min/max of scalar x across MPI processes.
+    Args:
+        x: An array containing samples of the scalar to produce statistics
+            for.
+        with_min_and_max (bool): If true, return min and max of x in 
+            addition to mean and std.
+    """
+    x = np.array(x, dtype=np.float32)
+    # global_sum, global_n = mpi_sum([np.sum(x), len(x)])
+    global_sum, global_n = np.sum(x), len(x)
+    mean = global_sum / global_n
+
+    global_sum_sq = np.sum((x - mean)**2)
+    std = np.sqrt(global_sum_sq / global_n)  # compute global std
+
+    if with_min_and_max:
+        global_min = np.min(x) if len(x) > 0 else np.inf
+        # global_min = mpi_op(np.min(x) if len(x) > 0 else np.inf, op=MPI.MIN)
+        global_max = np.max(x) if len(x) > 0 else -np.inf
+        # global_max = mpi_op(np.max(x) if len(x) > 0 else -np.inf, op=MPI.MAX)
+        return mean, std, global_min, global_max
+    return mean, std
+
 class Logger:
     """
     A general-purpose logger.
@@ -117,13 +142,90 @@ class Logger:
         self.log_current_row.clear()
         self.first_row=False
 
+class EpochLogger(Logger):
+    """
+    A variant of Logger tailored for tracking average values over epochs.
+    Typical use case: there is some quantity which is calculated many times
+    throughout an epoch, and at the end of the epoch, you would like to 
+    report the average / std / min / max value of that quantity.
+    With an EpochLogger, each time the quantity is calculated, you would
+    use 
+    .. code-block:: python
+        epoch_logger.store(NameOfQuantity=quantity_value)
+    to load it into the EpochLogger's state. Then at the end of the epoch, you 
+    would use 
+    .. code-block:: python
+        epoch_logger.log_tabular(NameOfQuantity, **options)
+    to record the desired values.
+    """
+
+    def __init__(self,args,output_fname='progress.csv'):
+        super().__init__(args=args,output_fname=output_fname)
+        self.epoch_dict = dict()
+
+    def store(self, vals):
+        """
+        Save something into the epoch_logger's current state.
+        Provide an arbitrary number of keyword arguments with numerical 
+        values.
+        """
+        for k,v in vals.items():
+            if not(k in self.epoch_dict.keys()):
+                self.epoch_dict[k] = []
+            self.epoch_dict[k].append(v)
+
+    def log_tabular(self, vals_dict,step, with_min_and_max=False, average_only=True):
+        """
+        Log a value or possibly the mean/std/min/max values of a diagnostic.
+        Args:
+            key (string): The name of the diagnostic. If you are logging a
+                diagnostic whose state has previously been saved with 
+                ``store``, the key here has to match the key you used there.
+            val: A value for the diagnostic. If you have previously saved
+                values for this key via ``store``, do *not* provide a ``val``
+                here.
+            with_min_and_max (bool): If true, log min and max values of the 
+                diagnostic over the epoch.
+            average_only (bool): If true, do not log the standard deviation
+                of the diagnostic over the epoch.
+        """
+        num_elements = len(vals_dict)
+        count,commit = 0 , False 
+        for key,val in vals_dict.items() : 
+            count+=1 
+            if count == num_elements :
+                commit = True  
+            if val is not None:
+                v = self.epoch_dict[key]
+                vals = np.concatenate(v) if isinstance(v[0], np.ndarray) and len(v[0].shape)>0 else v
+                stats = mpi_statistics_scalar(vals, with_min_and_max=with_min_and_max)
+                super().log_tabular(key if average_only else 'Average' + key, stats[0],step,commit)
+                if not(average_only):
+                    super().log_tabular('Std'+key, stats[1],step,commit)
+                if with_min_and_max:
+                    super().log_tabular('Max'+key, stats[3],step,commit)
+                    super().log_tabular('Min'+key, stats[2],step,commit)
+        self.epoch_dict[key] = []
+
+    def get_stats(self, key):
+        """
+        Lets an algorithm ask the logger for mean/std/min/max of a diagnostic.
+        """
+        v = self.epoch_dict[key]
+        vals = np.concatenate(v) if isinstance(v[0], np.ndarray) and len(v[0].shape)>0 else v
+        return mpi_statistics_scalar(vals)
+
+    def image_log(self,img_dict,step) : 
+        for k,v in img_dict.items() : 
+            self.wandb_logger.log(key=k,val=wandb.Image(v),step = step,commit=True) 
+
 class Wandb_Logger() :
     def __init__(self,args) :
         self.update = True  
         self.wandb_run = None 
         if args.wandb: 
             name = args.exp_name + time.strftime("_%Y-%m-%d") 
-            os.environ["WANDB_MODE"] = "offline" 
+           # os.environ["WANDB_MODE"] = "offline" 
             self.wandb_run = wandb.init(project='6.7950',config=args,tags=[args.exp_name],name=name,settings=wandb.Settings(start_method="fork",_disable_stats=True))  
         if self.wandb_run is None :
             self.update = False 

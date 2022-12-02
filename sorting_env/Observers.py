@@ -82,3 +82,29 @@ class Observer:
             obs_dict[id] = obs 
         return obs_dict
      
+    def fixed_feature_obs(self,agent_pos,agent_id=1) : 
+        all_pos,reward_pos = [] , []
+        for id in range(1,self.env.n+1) : 
+            if id !=agent_id : 
+                agent = self.env.agents[id] 
+                pos = list(agent.position_history[0]) 
+                all_pos.append(pos[0]/self.env.height) 
+                all_pos.append(pos[1]/self.env.width)
+            else :
+                pos = agent_pos 
+                all_pos.append(pos[0]/self.env.height) 
+                all_pos.append(pos[1]/self.env.width)
+        for k in self.env.banana_rewards : 
+            reward_pos.append(k[0]/self.env.height) 
+            reward_pos.append(k[1]/self.env.height)
+        all_pos,reward_pos = np.array(all_pos),np.array(reward_pos) 
+        obs_dict = {}  
+        pos = list(agent_pos) 
+        pos[0],pos[1] = agent.pos[0]/self.env.height, agent.pos[1] / self.env.width
+        one_hot_id = np.zeros((self.env.n)) 
+        one_hot_id[agent_id-1] = 1 
+        obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id])
+        if self.fights_info : 
+            obs = np.concatenate([obs,[0,0]])
+        obs_dict[agent_id] = obs 
+        return obs_dict

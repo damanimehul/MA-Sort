@@ -5,7 +5,7 @@ from policies import *
 from logger import * 
 
 def set_env(args) : 
-    return SortingEnv(n=args.n,obs_type=args.obs_type,random_init=args.random_init,fights_info=args.fights_info!=1,shuffle_ranks=args.shuffle_ranks==1)
+    return SortingEnv(n=args.n,obs_type=args.obs_type,random_init=args.random_init,fights_info=args.fights_info,shuffle_ranks=args.shuffle_ranks)
 
 def set_algo(args,policy,buffer,env,logger) : 
     gamma = args.gamma 
@@ -43,4 +43,4 @@ def set_policy(args,env) :
         raise NotImplementedError
 
 def set_logger(args) : 
-    return Logger(args) 
+    return EpochLogger(args) 
