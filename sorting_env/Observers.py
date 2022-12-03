@@ -80,7 +80,10 @@ class Observer:
             if self.fights_info : 
                 total_fights = agent.fights 
                 fights_won = agent.fights_won 
-                ratio = fights_won/total_fights
+                if total_fights !=0 :
+                    ratio = fights_won/total_fights
+                else :
+                    ratio = 0
                 obs = np.concatenate([obs,[ratio,min(total_fights,self.env.n)]])
             obs_dict[id] = obs 
         return obs_dict

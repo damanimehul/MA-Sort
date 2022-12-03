@@ -205,7 +205,7 @@ class EpochLogger(Logger):
                 if with_min_and_max:
                     super().log_tabular('Max'+key, stats[3],step,commit)
                     super().log_tabular('Min'+key, stats[2],step,commit)
-        self.epoch_dict[key] = []
+            self.epoch_dict[key] = []
 
     def get_stats(self, key):
         """
