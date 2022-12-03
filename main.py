@@ -21,6 +21,7 @@ if __name__ =='__main__' :
     parser.add_argument('--shuffle_ranks',action='store_true',default=False,help='If no shuffling, then the id of the agent already provides information about the optimal index, using this as a baseline to validate the learning algo ')
     parser.add_argument('--v_coeff',type=float,default=0.1,help='Coefficient for value loss')
     parser.add_argument('--log_freq',type=int,default=100,help='Frequency of logging, can basically be thought of as an epoch length')
+    parser.add_argument('--norm_rewards',action='store_true',default=False,help='Normalize rewards ')
     args = parser.parse_args()  
 
     args.output_dir = 'results/{}'.format(args.exp_name)

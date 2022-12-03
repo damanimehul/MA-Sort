@@ -5,7 +5,8 @@ from policies import *
 from logger import * 
 
 def set_env(args) : 
-    return SortingEnv(n=args.n,obs_type=args.obs_type,random_init=args.random_init,fights_info=args.fights_info,shuffle_ranks=args.shuffle_ranks)
+    return SortingEnv(n=args.n,obs_type=args.obs_type,random_init=args.random_init,
+    fights_info=args.fights_info,shuffle_ranks=args.shuffle_ranks,norm_reward=args.norm_rewards)
 
 def set_algo(args,policy,buffer,env,logger) : 
     gamma = args.gamma 

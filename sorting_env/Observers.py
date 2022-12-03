@@ -78,7 +78,10 @@ class Observer:
             one_hot_id[agent_id-1] = 1 
             obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id])
             if self.fights_info : 
-                obs = np.concatenate([obs,[agent.fights,agent.fights_won]])
+                total_fights = agent.fights 
+                fights_won = agent.fights_won 
+                ratio = fights_won/total_fights
+                obs = np.concatenate([obs,[ratio,min(total_fights,self.env.n)]])
             obs_dict[id] = obs 
         return obs_dict
      

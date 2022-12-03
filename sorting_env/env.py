@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 class SortingEnv(gym.Env):
-    def __init__(self,n=4,random_init=False,obs_type='features',fights_info=True,shuffle_ranks=True) :
+    def __init__(self,n=4,random_init=False,obs_type='features',fights_info=True,
+    shuffle_ranks=True,norm_reward= False) :
         self.height = 5 
         self.n = n 
         if self.n%2!=0:
@@ -26,8 +27,8 @@ class SortingEnv(gym.Env):
         self.moves = {0:[-1,0],1:[0,1],2:[1,0],3:[0,-1],4:[0,0]}  
         self.max_reward = n*2 
         self.min_reward = 2 
-        self.invalid_move_reward = -1 / self.max_reward
-        self.out_of_bounds_reward = -1 / self.max_reward
+        self.invalid_move_reward = -1 
+        self.out_of_bounds_reward = -1 
 
         print('Fights Info:' , fights_info)
         print('Shuffle Ranks:',shuffle_ranks) 
@@ -43,6 +44,8 @@ class SortingEnv(gym.Env):
         self.observer = Observer(self,obs_type,fights_info=fights_info)  
         self.observation_shape = self.observer.observation_shape 
         self.shuffle_ranks = shuffle_ranks
+        self.norm_reward = norm_reward
+
         self.build_env() 
         self.reset() 
 
@@ -82,6 +85,13 @@ class SortingEnv(gym.Env):
         self.agent_map.set_agent_positions(new_positions)
         if not self.solved : 
             self.solved = self.check_solved(new_positions)
+        
+        #Normalizes the banana rewards given 
+        if self.norm_reward : 
+            for k,v in rewards.items() : 
+                if v>0 :
+                    rewards[k] = v/self.max_reward
+
         return self.observer.get_obs(),rewards,False, None 
 
     def add(self,pos,move) : 
@@ -103,13 +113,13 @@ class SortingEnv(gym.Env):
         reward_to_pos = {} 
         for i in self.banana_locations : 
             for j in [0,self.height-1] :
-                self.banana_rewards[(j,i)] = current_reward / self.max_reward
-                reward_to_pos[current_reward/self.max_reward] = (j,i)
+                self.banana_rewards[(j,i)] = current_reward 
+                reward_to_pos[current_reward] = (j,i)
                 current_reward-=self.min_reward 
                 
         self.optimal_rank_pos = {} 
         for i in range(0,self.n) : 
-            opt_reward = (self.max_reward - i*self.min_reward )/self.max_reward
+            opt_reward = self.max_reward - i*self.min_reward 
             self.optimal_rank_pos[i+1] = reward_to_pos[opt_reward]
        
     def get_width(self,n) :
