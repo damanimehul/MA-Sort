@@ -33,6 +33,9 @@ if __name__ =='__main__' :
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
+    if args.seed !=0 : 
+        args.save_gifs = False 
+        
     env = setter.set_env(args) 
     policy = setter.set_policy(args,env) 
     buffer = setter.set_buffer(args,env) 
