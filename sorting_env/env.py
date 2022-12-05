@@ -79,9 +79,9 @@ class SortingEnv(gym.Env):
         return stat_dict 
 
     def step(self,actions) : 
-        new_positions, rewards = self.collision_check(actions) 
+        new_positions, rewards,had_fight_dict = self.collision_check(actions) 
         for monkey in self.agents.values() : 
-            monkey.update(new_positions[monkey.id],rewards[monkey.id]) 
+            monkey.update(new_positions[monkey.id],rewards[monkey.id],had_fight_dict[monkey.id]) 
         self.agent_map.set_agent_positions(new_positions)
         if not self.solved : 
             self.solved = self.check_solved(new_positions)
@@ -144,10 +144,11 @@ class SortingEnv(gym.Env):
         return False 
 
     def collision_check(self,actions) :         
-        new_pos_dict,rewards_dict,not_set = {},{},[] 
+        new_pos_dict,rewards_dict,had_fight,not_set = {},{},{},[] 
         fights= [] 
         for id in range(1,self.n+1) : 
             rewards_dict[id] = 0 
+            had_fight[id] = 0 
         for agent_id in range(1,self.n+1) : 
             agent_pos = self.agents[agent_id].pos 
             agent_move = self.moves[actions[agent_id]] 
@@ -232,6 +233,8 @@ class SortingEnv(gym.Env):
                                         new_pos_dict[agent_flag] =  agent_pos 
                                         rewards_dict[agent_id] += self.banana_rewards[newpos] 
                                         rewards_dict[agent_flag] = 0 
+                                        had_fight[agent_flag] = 1 
+                                        had_fight[agent_id] = 1
                                         remove.extend([agent_flag,agent_id]) 
                                         self.fight_history[(agent_flag,agent_id)] = agent_id
                                         self.agent_map.swap([agent_id,agent_flag],[newpos,agent_pos]) 
@@ -249,6 +252,8 @@ class SortingEnv(gym.Env):
                                         new_pos_dict[agent_flag] =  newpos
                                         rewards_dict[agent_flag] += self.banana_rewards[newpos]
                                         rewards_dict[agent_id] = 0 
+                                        had_fight[agent_flag] = 1 
+                                        had_fight[agent_id] = 1
                                         remove.extend([agent_flag,agent_id])
                                         self.fight_history[(agent_flag,agent_id)] = agent_flag
                                         self.agents[agent_id].fight_update(0,agent_flag) 
@@ -309,7 +314,7 @@ class SortingEnv(gym.Env):
                 rewards_dict[id]= int(rewards_dict[id]/2)
 
         assert len(not_set) ==0 
-        return new_pos_dict,rewards_dict
+        return new_pos_dict,rewards_dict,had_fight
 
     def get_v_map(self,policy,device,agent_id=1) : 
         v_map = np.ones((self.height,self.width)) * 10000

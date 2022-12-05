@@ -17,12 +17,15 @@ class Monkey :
         self.reward_history = []
         self.fights = 0 
         self.fights_won = 0  
+        self.had_fight = 0 
         self.fight_dict = {} 
-
-    def update(self,new_pos,r) : 
+        self.fight_history = [0]
+        
+    def update(self,new_pos,r,had_fight) : 
         self.pos = new_pos 
         self.position_history.append(new_pos) 
         self.reward_history.append(r) 
+        self.fight_history.append(had_fight)
 
     def fight_update(self,win,agent_id) : 
         self.fight_dict[agent_id] = win 
@@ -33,7 +36,7 @@ class Monkey :
             self.fights+=1 
 
     def reset_agent(self,init_pos,rank) : 
-        self.pos,self.position_history,self.reward_history,self.rank,self.fights,self.fights_won = init_pos, [init_pos], [] ,rank ,0,0 
+        self.pos,self.position_history,self.fight_history,self.reward_history,self.rank,self.fights,self.fights_won = init_pos, [init_pos],[0], [] ,rank ,0,0 
         self.fight_dict = {} 
 
 class AgentMap : 

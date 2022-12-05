@@ -17,7 +17,7 @@ def set_algo(args,policy,buffer,env,logger) :
     gif_path = logger.gif_directory 
     v_coeff = args.v_coeff
     return A2C(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
-    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff)
+    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy)
 
 def set_buffer(args,env) :  
     if not args.single_agent : 
@@ -38,8 +38,12 @@ def set_policy(args,env) :
         lr = args.lr 
         observation_space = env.observation_shape
         action_space = env.action_space 
-        net_arch = args.hidden_sizes 
-        return ActorCriticPolicy(observation_space=observation_space,action_space=action_space,lr=lr,net_arch=net_arch) 
+        net_arch = args.hidden_sizes  
+        if args.multi_policy : 
+            policy = {id : ActorCriticPolicy(observation_space=observation_space,action_space=action_space,lr=lr,net_arch=net_arch) for id in range(1,args.n+1) }
+            return policy
+        else :
+            return ActorCriticPolicy(observation_space=observation_space,action_space=action_space,lr=lr,net_arch=net_arch) 
     else :
         raise NotImplementedError
 

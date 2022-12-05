@@ -7,7 +7,7 @@ from PIL import Image
 class A2C():
    
     def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, 
-    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100,save_gifs=False,gif_frequency=50,gif_path=None):
+    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100,save_gifs=False,gif_frequency=50,gif_path=None,multi_policy=False):
 
         self.policy = policy 
         self.env = env 
@@ -27,9 +27,16 @@ class A2C():
         self.save_gifs = save_gifs 
         self.gif_frequency = gif_frequency
         self.set_random_seed(seed) 
-        self.policy = self.policy.to(self.device)
         self.episode_num = 0 
         self.gif_path = gif_path
+        self.multi_policy = multi_policy
+        if self.multi_policy : 
+            self.num_iterations = self.num_agents
+            assert type(self.policy) == dict 
+            for id in range(1,self.num_agents+1):
+                self.policy[id] = self.policy[id].to(self.device)
+        else : 
+            self.policy = self.policy.to(self.device)
         if save_gifs : 
             assert gif_path is not None 
  
@@ -48,31 +55,51 @@ class A2C():
         Update policy using the currently gathered
         rollout buffer (one gradient step over whole data).
         """
+        if self.multi_policy : 
+            p_loss, v_loss, e_loss = {},{},{} 
+        else : 
+            p_loss, v_loss, e_loss = [],[],[]
 
-        p_loss, v_loss, e_loss = [],[],[]
-        for _ in range(self.num_iterations) : 
-            batch = self.buffer.sample_batch() 
+        for i in range(self.num_iterations) : 
+            agent_id = i+1 
+            if self.multi_policy : 
+                batch = self.buffer.sample_batch(agent_id) 
+                policy = self.policy[agent_id] 
+            else : 
+                policy = self.policy 
+                batch = self.buffer.sample_batch() 
+
             obs,actions,values, log_probs,advantages,returns = batch['obs'],batch['actions'],batch['values'],batch['log_probs'],batch['advantages'],batch['returns']
             obs = obs_as_tensor(obs, self.device)
-            values, log_prob, entropy = self.policy.evaluate_actions(obs,actions) 
+            values, log_prob, entropy = policy.evaluate_actions(obs,actions) 
             policy_loss = -(advantages * log_prob).mean() 
             value_loss = F.mse_loss(returns, values) 
             entropy_loss = -th.mean(entropy)
             loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
-            self.policy.optimizer.zero_grad()
+            policy.optimizer.zero_grad()
             loss.backward()
-            th.nn.utils.clip_grad_norm_(self.policy.parameters(), self.max_grad_norm)
-            self.policy.optimizer.step()
-            
-            # Append losses
-            p_loss.append(policy_loss.item()) 
-            v_loss.append(value_loss.item()) 
-            e_loss.append(entropy_loss.item())
+            th.nn.utils.clip_grad_norm_(policy.parameters(), self.max_grad_norm)
+            policy.optimizer.step()
+            if self.multi_policy : 
+                p_loss[agent_id] = policy_loss.item() 
+                v_loss[agent_id] = value_loss.item() 
+                e_loss[agent_id] = entropy_loss.item() 
+            else : 
+                # Append losses
+                p_loss.append(policy_loss.item()) 
+                v_loss.append(value_loss.item()) 
+                e_loss.append(entropy_loss.item())
        
         train_stats = {} 
-        train_stats['Policy Loss'] = np.mean(p_loss)
-        train_stats['Value Loss'] = np.mean(v_loss) 
-        train_stats['Entropy Loss'] = np.mean(e_loss)
+        if self.multi_policy : 
+            for agent_id in range(1,self.num_agents+1) : 
+                train_stats['Agent {} Policy Loss'.format(agent_id)] = np.mean(p_loss[agent_id])
+                train_stats['Agent {} Value Loss'.format(agent_id)] = np.mean(v_loss[agent_id]) 
+                train_stats['Agent {} Entropy Loss'.format(agent_id)] = np.mean(e_loss[agent_id])
+        else : 
+            train_stats['Policy Loss'] = np.mean(p_loss)
+            train_stats['Value Loss'] = np.mean(v_loss) 
+            train_stats['Entropy Loss'] = np.mean(e_loss)
         return train_stats
 
     def collect_rollout(self) : 
@@ -120,7 +147,10 @@ class A2C():
                     for id in range(1,self.num_agents+1) : 
                 # Convert to pytorch tensor or to TensorDict
                         obs_tensor = obs_as_tensor(obs[id], self.device)
-                        actions[id], values[id], log_probs[id] = self.policy(obs_tensor)
+                        if self.multi_policy :
+                            actions[id], values[id], log_probs[id] = self.policy[id](obs_tensor)
+                        else :
+                            actions[id], values[id], log_probs[id] = self.policy(obs_tensor)
                         env_actions[id] = int(actions[id])
                         actions[id] = actions[id].cpu().numpy()
             new_obs, rewards, dones, infos = self.env.step(env_actions) 
@@ -136,7 +166,10 @@ class A2C():
         with th.no_grad():
             for id in range(1,self.num_agents+1) : 
                     obs_tensor = obs_as_tensor(new_obs[id], self.device)
-                    terminal_values[id] = self.policy.predict_values(obs_tensor)[0]
+                    if self.multi_policy : 
+                        terminal_values[id] = self.policy[id].predict_values(obs_tensor)[0]
+                    else :
+                        terminal_values[id] = self.policy.predict_values(obs_tensor)[0]
            
         self.buffer.compute_returns_and_advantages(last_values=terminal_values)
         self.episode_num +=1 
@@ -151,7 +184,10 @@ class A2C():
     def get_img_stats(self) : 
         im_stats = {} 
         for id in [1,self.num_agents] : 
-            im_stats['Agent {} Value Map'.format(id)] = self.env.get_v_map(self.policy,self.device,id) 
+            if self.multi_policy :
+                im_stats['Agent {} Value Map'.format(id)] = self.env.get_v_map(self.policy[id],self.device,id) 
+            else :
+                im_stats['Agent {} Value Map'.format(id)] = self.env.get_v_map(self.policy,self.device,id) 
         return im_stats
 
 if __name__=='__main__' : 

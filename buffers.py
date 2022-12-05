@@ -20,9 +20,10 @@ class MultiAgentBuffer() :
         for id,buffer in self.buffers.items() : 
             buffer.add(obs[id], action[id], reward[id],value[id], log_prob[id]) 
 
-    def sample_batch(self) : 
-        random_agent = np.random.randint(1,self.num_agents+1) 
-        return self.buffers[random_agent].sample_batch() 
+    def sample_batch(self,id=None) : 
+        if id is None : 
+            id = np.random.randint(1,self.num_agents+1) 
+        return self.buffers[id].sample_batch() 
 
 class RolloutBuffer():
     def __init__(self,buffer_size=100,action_dim=5,obs_dim=22,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99):

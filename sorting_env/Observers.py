@@ -18,7 +18,7 @@ class Observer:
             return {'grid':[size,size,3]} 
         elif self.obs_type == 'features' : 
             # shape = all agent positions + banana locations + my position + my id 
-            shape = self.env.n*2 + self.env.n*2 + 2 + self.env.n 
+            shape = self.env.n*2 + self.env.n*2 + 2 + self.env.n + 1 
             if self.fights_info : 
                 shape +=2 
             return {'features':shape} 
@@ -76,7 +76,8 @@ class Observer:
             agent_id = agent.id 
             one_hot_id = np.zeros((self.env.n)) 
             one_hot_id[agent_id-1] = 1 
-            obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id])
+            fought = agent.fight_history[-1] 
+            obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id,[fought]])
             if self.fights_info : 
                 total_fights = agent.fights 
                 fights_won = agent.fights_won 
@@ -109,7 +110,7 @@ class Observer:
         pos[0],pos[1] = agent.pos[0]/self.env.height, agent.pos[1] / self.env.width
         one_hot_id = np.zeros((self.env.n)) 
         one_hot_id[agent_id-1] = 1 
-        obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id])
+        obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id,[agent.fight_history[-1]]])
         if self.fights_info : 
             obs = np.concatenate([obs,[0,0]])
         obs_dict[agent_id] = obs 

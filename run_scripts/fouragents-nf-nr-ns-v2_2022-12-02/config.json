@@ -1,1 +1,0 @@
-"{\"0\": \" --exp_name fouragents-nf-nr-ns-v2 --save_gifs --wandb --max_ep_len 50 --lr 1e-4  --n 4 --gif_frequency 500 --train_episodes 20000 --v_coeff 0.005 \"}"

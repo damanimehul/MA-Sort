@@ -11,6 +11,8 @@ def get_args() :
     parser.add_argument('--name' ,type = str , default=None , help= 'Name for campaign to run') 
     parser.add_argument('--params', type = str, default= None , help='Other specific params in a string eg. --others "--neptune --hello"')  
     parser.add_argument('--use_grid' , action='store_true', default = False , help = 'Use itertools to get all combinations of items defined in grid')
+    parser.add_argument('--seeds',type=int,default=1,help='Number of seeds for each run')
+
     args = parser.parse_args() 
     return args 
 
@@ -20,7 +22,8 @@ def get_configs(grid) :
         desired_config = '' 
         config = grid[i] 
         for k,v in config.items() :
-            desired_config += ' --' + str(k) + ' ' + str(v)  
+            if v !=None :
+                desired_config += ' --' + str(k) + ' ' + str(v)  
 
         final_configs.append(desired_config)
     return final_configs
@@ -50,7 +53,7 @@ def remove_ignore_configs(grid,ignore) :
     return new_grid 
         
 if __name__ == '__main__': 
-    grid = {"v_fit_rate":[150],"current_ability":['target'],"target":['old_target'],"resample_frequency":[20],"her_ratio":[3]} 
+    grid = {"multi_policy":['',None],"norm_rewards":['',None],"shuffle_ranks":['',None],"v_coeff":[0.01,0.0025]} 
     configs = [''] 
     args = get_args() 
 
@@ -67,19 +70,26 @@ if __name__ == '__main__':
     if args.params is not None:
         experiment_arguments = args.params 
 
-    config_dict = {} 
- 
-    for setup in configs :  
-
-        config_dict[len(config_dict)] = str(' --exp_name {}'.format(experiment_name) +  '{}'.format(args.params))
+    config_dict,details = {} , {'base':args.params} 
+    
+    for i,setup in enumerate(configs) :   
+        details[i] = setup 
+        for seed in range(args.seeds) : 
+            experiment_name = args.name + '-' + str(len(config_dict)) + '-s' + str(seed) 
+            config_dict[len(config_dict)] = str(' --exp_name {} --seed {} '.format(experiment_name,seed) +  '{} {} '.format(args.params,setup))
                           
 encoded_configs = jsonpickle.encode(config_dict) 
-path = "run_scripts/" + experiment_name + "_" + time.strftime("%Y-%m-%d") 
+path = "run_scripts/" + args.name + "_" + time.strftime("%Y-%m-%d") 
 os.makedirs(path) 
-encoded_details = jsonpickle.encode({'grid':grid , 'use_grid':args.use_grid}) 
+
+encoded_details = jsonpickle.encode(details)  
 
 with open(path+"/config.json","w") as file :
     json.dump(encoded_configs,file) 
+    file.close() 
+
+with open(path+"/details.json","w") as file :
+    json.dump(encoded_details,file) 
     file.close() 
 
 with open(path+"/runner.sh","w") as file : 
@@ -97,9 +107,9 @@ with open(path+"/job.slurm","w") as f :
     f.write('#SBATCH --time=12:00:00\n')
     f.write('#SBATCH --mem=8G\n')
     f.write('#SBATCH -c 1\n') 
-    f.write('#SBATCH -N 1\n') 
+    f.write('#SBATCH --array=1-{}\n'.format(len(config_dict)) ) 
     f.write('module purge\n')
     f.write('source ~/.bashrc\n') 
     f.write('module load anaconda/2021b\n') 
     f.write('cd $HOME/6.7950-project\n')
-    f.write('python full_runner.py --path {}\n'.format(path)) 
+    f.write('python full_runner.py --path {} --array_id $SLURM_ARRAY_TASK_ID\n'.format(path)) 
