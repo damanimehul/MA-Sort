@@ -6,6 +6,7 @@ import numpy as np
 if __name__ =='__main__' : 
     parser = argparse.ArgumentParser() 
     parser.add_argument('--exp_name',type=str,default='Simple-Run',help='Give a name to the experiment')
+    parser.add_argument('--tag',type=str,default=None,help='if doing a batch job, then this should be the name of the batch job. For a single run it is just the exp_name')
     parser.add_argument('--obs_type',type=str,default='features',help='Select the observation type between grid/features/both')
     parser.add_argument('--n',type=int,default=4,help='Number of agents to make the environment from')
     parser.add_argument('--seed',type=int,default=0,help='Number of agents to make the environment from')
@@ -27,7 +28,9 @@ if __name__ =='__main__' :
     parser.add_argument('--multi_policy',action='store_true',default=False,help='Share policy parameters or not, if sharing then the policy returned by setter would be a dictionary containing policy objects ')
     args = parser.parse_args()  
 
-    args.output_dir = 'results/{}'.format(args.exp_name)
+    if args.tag is None : 
+        args.tag = args.exp_name 
+    args.output_dir = 'results/{}/{}'.format(args.tag,args.exp_name)
 
     # Setting required seeds for random number generators 
     np.random.seed(args.seed)
@@ -35,7 +38,7 @@ if __name__ =='__main__' :
 
     if args.seed !=0 : 
         args.save_gifs = False 
-        
+
     env = setter.set_env(args) 
     policy = setter.set_policy(args,env) 
     buffer = setter.set_buffer(args,env) 

@@ -76,7 +76,7 @@ if __name__ == '__main__':
         details[i] = setup 
         for seed in range(args.seeds) : 
             experiment_name = args.name + '-' + str(len(config_dict)) + '-s' + str(seed) 
-            config_dict[len(config_dict)] = str(' --exp_name {} --seed {} '.format(experiment_name,seed) +  '{} {} '.format(args.params,setup))
+            config_dict[len(config_dict)] = str(' --exp_name {} --seed {} --tag {} '.format(experiment_name,seed,args.name) +  '{} {} '.format(args.params,setup))
                           
 encoded_configs = jsonpickle.encode(config_dict) 
 path = "run_scripts/" + args.name + "_" + time.strftime("%Y-%m-%d") 
