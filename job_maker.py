@@ -53,7 +53,7 @@ def remove_ignore_configs(grid,ignore) :
     return new_grid 
         
 if __name__ == '__main__': 
-    grid = {"multi_policy":['',None],"norm_rewards":['',None],"shuffle_ranks":['',None],"v_coeff":[0.01,0.0025]} 
+    grid = {"multi_policy":['',None],"shuffle_ranks":['',None],"v_coeff":[0.01],"algo":['a2c','ppo'],"train_freq":[10,50]} 
     configs = [''] 
     args = get_args() 
 
@@ -104,7 +104,7 @@ with open(path+"/job.slurm","w") as f :
     f.write('#SBATCH --output=/home/gridsan/mdamani/6.7950-project/slurm_jobs/{}/%a_%x_%j.out\n'.format(args.name)) 
     f.write('#SBATCH --error=/home/gridsan/mdamani/6.7950-project/slurm_jobs/{}/%a_%x_%j.err\n'.format(args.name)) 
     f.write('#SBATCH --export=ALL\n') 
-    f.write('#SBATCH --time=12:00:00\n')
+    f.write('#SBATCH --time=30:00:00\n')
     f.write('#SBATCH --mem=8G\n')
     f.write('#SBATCH -c 1\n') 
     f.write('#SBATCH --array=1-{}\n'.format(len(config_dict)) ) 

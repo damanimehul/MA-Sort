@@ -2,7 +2,7 @@ import numpy as np
 from utils import * 
 class MultiAgentBuffer() : 
     # Wraps around single agent buffer 
-    def __init__(self,num_agents=4,buffer_size=100,action_dim=5,obs_dim=24,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99) : 
+    def __init__(self,num_agents=4,buffer_size=5000,action_dim=5,obs_dim=24,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99) : 
         self.num_agents = num_agents 
         self.device= get_device(device)
         self.buffers = {id:RolloutBuffer(buffer_size,action_dim,obs_dim,device,gae_lambda,gamma) for id in range(1,self.num_agents+1)}
@@ -26,7 +26,7 @@ class MultiAgentBuffer() :
         return self.buffers[id].sample_batch() 
 
 class RolloutBuffer():
-    def __init__(self,buffer_size=100,action_dim=5,obs_dim=22,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99):
+    def __init__(self,buffer_size=5000,action_dim=5,obs_dim=22,device:Union[th.device, str] = "auto",gae_lambda= 1,gamma=0.99):
 
         self.buffer_size = buffer_size 
         self.action_dim = action_dim 
@@ -36,7 +36,6 @@ class RolloutBuffer():
         self.gamma = gamma
         self.observations, self.actions, self.rewards, self.advantages = None, None, None, None
         self.returns, self.episode_starts, self.values, self.log_probs = None, None, None, None
-        self.generator_ready = False
         self.reset()
 
     def reset(self) -> None:
@@ -49,7 +48,6 @@ class RolloutBuffer():
         self.values = np.zeros((self.buffer_size), dtype=np.float32)
         self.log_probs = np.zeros((self.buffer_size), dtype=np.float32)
         self.advantages = np.zeros((self.buffer_size), dtype=np.float32)
-        self.generator_ready = False
 
     def compute_returns_and_advantage(self, last_values):
         # Convert to numpy

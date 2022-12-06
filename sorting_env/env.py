@@ -29,7 +29,8 @@ class SortingEnv(gym.Env):
         self.min_reward = 2 
         self.invalid_move_reward = -1 
         self.out_of_bounds_reward = -1 
-
+        self.stopping_reward = -0.5 
+   
         print('Fights Info:' , fights_info)
         print('Shuffle Ranks:',shuffle_ranks) 
         print('Random Init',random_init)
@@ -72,6 +73,7 @@ class SortingEnv(gym.Env):
         stat_dict['Fights'] = self.fights 
         stat_dict['Redundant Fights'] = self.redundant_fights 
         stat_dict['Solved'] = int(self.solved) *100 
+        stat_dict['All on Reward States'] = int(self.all_on_reward_states) *100 
         stat_dict['Invalid Actions'] = self.invalid_actions / self.n  
 
         for id in range(1,self.n+1) : 
@@ -85,6 +87,7 @@ class SortingEnv(gym.Env):
         self.agent_map.set_agent_positions(new_positions)
         if not self.solved : 
             self.solved = self.check_solved(new_positions)
+        self.all_on_reward_states  = self.check_on_reward_states(new_positions)
         
         #Normalizes the banana rewards given 
         if self.norm_reward : 
@@ -132,6 +135,12 @@ class SortingEnv(gym.Env):
         for agent_id,pos in new_pos.items() : 
             rank  = self.agents[agent_id].rank 
             if not self.optimal_rank_pos[rank] == pos  : 
+                return False 
+        return True 
+
+    def check_on_reward_states(self,new_pos) : 
+        for agent_id,pos in new_pos.items() : 
+            if tuple(pos) not in self.banana_rewards : 
                 return False 
         return True 
 
@@ -312,6 +321,8 @@ class SortingEnv(gym.Env):
         for id,r in rewards_dict.items() :
             if tuple(new_pos_dict[id]) in self.banana_rewards and r> self.max_reward :
                 rewards_dict[id]= int(rewards_dict[id]/2)
+            if actions[id] == 4 and tuple(new_pos_dict[id]) not in self.banana_rewards: 
+                rewards_dict[id] += self.stopping_reward
 
         assert len(not_set) ==0 
         return new_pos_dict,rewards_dict,had_fight
@@ -376,23 +387,25 @@ class SortingEnv(gym.Env):
 if __name__=='__main__': 
     import Observers 
     import env_utils
-    env = SortingEnv(4,False) 
+    env = SortingEnv(4,shuffle_ranks=False,fights_info=False) 
     map = env.reset()
     array = env.render() 
-   # plt.imshow(array) 
-   # plt.show() 
-   # plt.close() 
+    plt.imshow(array) 
+    plt.show() 
+    plt.close() 
     break_flag = 0
     for j in range(1): 
         imgs =[Image.fromarray(array)] 
         for _ in range(20) : 
             actions = {} 
-            a = '4444'
+            a = str(input('a:'))
             for i in range(1,5) : 
                 actions[i] = int(a[i-1])  #env.action_space.sample()  # int(a[i-1])#
             try :
                 print(actions)
                 o,r,_,_ = env.step(actions) 
+                print(o)
+                print('r',r)
             except :
                 break_flag = 1 
                 break
@@ -400,9 +413,9 @@ if __name__=='__main__':
            # print(o) 
             array = env.render()
             
-            #plt.imshow(array) 
-            #plt.show()
-            #plt.close() 
+            plt.imshow(array) 
+            plt.show()
+            plt.close() 
             #except :
             #    break_flag = 1
             #    break 

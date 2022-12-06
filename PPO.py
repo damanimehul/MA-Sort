@@ -4,10 +4,10 @@ from utils import *
 from typing import Dict, Iterable, List, Optional, Tuple, Union 
 from PIL import Image
 
-class A2C():
+class PPO():
    
     def __init__(self,policy, env, buffer, gamma = 0.99, gae_lambda= 1.0, ent_coef = 0.0, vf_coef = 0.5, max_grad_norm = 0.5, seed = 0,num_iterations=10, 
-    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100,save_gifs=False,gif_frequency=50,gif_path=None,multi_policy=False):
+    device:Union[th.device, str] = "auto",multi_agent=True,max_ep_len=100,save_gifs=False,gif_frequency=50,gif_path=None,multi_policy=False,clip_coeff=0.1):
 
         self.policy = policy 
         self.env = env 
@@ -30,6 +30,7 @@ class A2C():
         self.episode_num = 0 
         self.gif_path = gif_path
         self.multi_policy = multi_policy
+        self.clip_coeff = clip_coeff
         if self.multi_policy : 
             self.num_iterations = self.num_agents
             assert type(self.policy) == dict 
@@ -56,9 +57,9 @@ class A2C():
         rollout buffer (one gradient step over whole data).
         """
         if self.multi_policy : 
-            p_loss, v_loss, e_loss = {},{},{} 
+            p_loss, v_loss, e_loss,cf = {},{},{} ,{} 
         else : 
-            p_loss, v_loss, e_loss = [],[],[]
+            p_loss, v_loss, e_loss,cf = [],[],[],[]
 
         for i in range(self.num_iterations) : 
             agent_id = i+1 
@@ -73,7 +74,14 @@ class A2C():
             obs = obs_as_tensor(obs, self.device)
             values, log_prob, entropy = policy.evaluate_actions(obs,actions) 
             values = values.flatten()
-            policy_loss = -(advantages * log_prob).mean() 
+
+            with th.no_grad() : 
+                ratio = th.exp(log_prob - log_probs)
+
+            policy_loss_1 = advantages*ratio 
+            policy_loss_2 = advantages * th.clamp(ratio, 1 - self.clip_coeff, 1 + self.clip_coeff) 
+            policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
+            clip_fraction = th.mean((th.abs(ratio - 1) > self.clip_coeff).float()).item() 
             value_loss = F.mse_loss(returns, values) 
             entropy_loss = -th.mean(entropy)
             loss = policy_loss + self.ent_coef * entropy_loss + self.vf_coef * value_loss
@@ -81,15 +89,18 @@ class A2C():
             loss.backward()
             th.nn.utils.clip_grad_norm_(policy.parameters(), self.max_grad_norm)
             policy.optimizer.step()
+            
             if self.multi_policy : 
                 p_loss[agent_id] = policy_loss.item() 
                 v_loss[agent_id] = value_loss.item() 
                 e_loss[agent_id] = entropy_loss.item() 
+                cf[agent_id] = clip_fraction 
             else : 
                 # Append losses
                 p_loss.append(policy_loss.item()) 
                 v_loss.append(value_loss.item()) 
                 e_loss.append(entropy_loss.item())
+                cf.append(clip_fraction)
        
         train_stats = {} 
         if self.multi_policy : 
@@ -97,10 +108,13 @@ class A2C():
                 train_stats['Agent {} Policy Loss'.format(agent_id)] = np.mean(p_loss[agent_id])
                 train_stats['Agent {} Value Loss'.format(agent_id)] = np.mean(v_loss[agent_id]) 
                 train_stats['Agent {} Entropy Loss'.format(agent_id)] = np.mean(e_loss[agent_id])
+                train_stats['Agent {} Clip Fraction'.format(agent_id)] = np.mean(cf[agent_id])
         else : 
             train_stats['Policy Loss'] = np.mean(p_loss)
             train_stats['Value Loss'] = np.mean(v_loss) 
             train_stats['Entropy Loss'] = np.mean(e_loss)
+            train_stats['Clip Fraction'] = np.mean(cf)
+
         return train_stats
 
     def collect_rollout(self) : 

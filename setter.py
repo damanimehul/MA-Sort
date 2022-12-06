@@ -3,6 +3,7 @@ from A2C import A2C
 from buffers import * 
 from policies import * 
 from logger import * 
+from PPO import PPO 
 
 def set_env(args) : 
     return SortingEnv(n=args.n,obs_type=args.obs_type,random_init=args.random_init,
@@ -15,9 +16,15 @@ def set_algo(args,policy,buffer,env,logger) :
     save_gifs = args.save_gifs
     gif_frequency = args.gif_frequency  
     gif_path = logger.gif_directory 
-    v_coeff = args.v_coeff
-    return A2C(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
-    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy)
+    v_coeff = args.v_coeff 
+    if args.algo =='a2c' : 
+        return A2C(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
+    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy) 
+    elif args.algo == 'ppo' : 
+        return PPO(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
+    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy) 
+    else :
+        raise NotImplementedError 
 
 def set_buffer(args,env) :  
     if not args.single_agent : 

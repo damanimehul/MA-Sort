@@ -26,6 +26,8 @@ if __name__ =='__main__' :
     parser.add_argument('--log_freq',type=int,default=100,help='Frequency of logging, can basically be thought of as an epoch length')
     parser.add_argument('--norm_rewards',action='store_true',default=False,help='Normalize rewards ')
     parser.add_argument('--multi_policy',action='store_true',default=False,help='Share policy parameters or not, if sharing then the policy returned by setter would be a dictionary containing policy objects ')
+    parser.add_argument('--train_freq',type=int,default=10,help='How many episodes to rollout before calling algo.train() ')
+    parser.add_argument('--algo',type=str,default='a2c',help='Which algorithm to run between A2C/PPO ')
     args = parser.parse_args()  
 
     if args.tag is None : 
@@ -45,19 +47,23 @@ if __name__ =='__main__' :
     logger = setter.set_logger(args) 
     algo = setter.set_algo(args,policy,buffer,env,logger) 
 
+    train_frequency = args.train_freq 
+
     ep = 0 
     while ep < args.train_episodes : 
         ep_stats = algo.collect_rollout()  
-        train_stats = algo.train() 
         logger.store(ep_stats) 
-        logger.store(train_stats) 
         ep+=1 
+        if ep%train_frequency == 0 : 
+            train_stats = algo.train() 
+            logger.store(train_stats) 
 
         if ep%args.log_freq ==0 : 
             logger.log_tabular(ep_stats,step=ep) 
             logger.log_tabular(train_stats,step=ep) 
-            img_stats = algo.get_img_stats() 
-            logger.image_log(img_stats,step=ep)
+            if args.seed ==0 :
+                img_stats = algo.get_img_stats() 
+                logger.image_log(img_stats,step=ep)
             logger.dump_tabular() 
 
     
