@@ -36,7 +36,8 @@ def set_buffer(args,env) :
             obs_dim = env.observation_shape['grid'] 
         num_agents = args.n 
         gamma = args.gamma 
-        return MultiAgentBuffer(obs_dim=obs_dim,action_dim=action_dim,num_agents=num_agents,gamma=gamma,buffer_size=buffer_size) 
+        num_eps = args.train_freq 
+        return MultiAgentBuffer(obs_dim=obs_dim,action_dim=action_dim,num_agents=num_agents,gamma=gamma,buffer_size=buffer_size,num_eps=num_eps) 
     else : 
         raise NotImplementedError 
 

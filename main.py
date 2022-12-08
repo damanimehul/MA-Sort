@@ -17,16 +17,16 @@ if __name__ =='__main__' :
     parser.add_argument('--train_episodes',type=int,default=20000,help='Number of episodes to train for')
     parser.add_argument('--wandb',action='store_true',default=False,help='Log on wandb')
     parser.add_argument('--single_agent',action='store_true',default=False,help='Single centralized agent or not')
-    parser.add_argument('--max_ep_len',type=int,default=100,help='Maximum episode length')
+    parser.add_argument('--max_ep_len',type=int,default=50,help='Maximum episode length')
     parser.add_argument('--lr',type=float,default=5e-5,help='Learning rate') 
     parser.add_argument('--hidden_sizes',type=list,default=[128,128],help='Hidden dizes for the shared actor critic network')
     parser.add_argument('--fights_info',action='store_true',default=False,help='Whether or not to provide information about total fights and fights won if using feature based obs ')
     parser.add_argument('--shuffle_ranks',action='store_true',default=False,help='If no shuffling, then the id of the agent already provides information about the optimal index, using this as a baseline to validate the learning algo ')
-    parser.add_argument('--v_coeff',type=float,default=0.1,help='Coefficient for value loss')
+    parser.add_argument('--v_coeff',type=float,default=0.01,help='Coefficient for value loss')
     parser.add_argument('--log_freq',type=int,default=100,help='Frequency of logging, can basically be thought of as an epoch length')
     parser.add_argument('--norm_rewards',action='store_true',default=False,help='Normalize rewards ')
     parser.add_argument('--multi_policy',action='store_true',default=False,help='Share policy parameters or not, if sharing then the policy returned by setter would be a dictionary containing policy objects ')
-    #parser.add_argument('--train_freq',type=int,default=10,help='How many episodes to rollout before calling algo.train() ')
+    parser.add_argument('--train_freq',type=int,default=10,help='How many episodes to rollout before calling algo.train() ')
     parser.add_argument('--algo',type=str,default='a2c',help='Which algorithm to run between A2C/PPO ')
     args = parser.parse_args()  
 
@@ -52,8 +52,9 @@ if __name__ =='__main__' :
         ep_stats = algo.collect_rollout()  
         logger.store(ep_stats) 
         ep+=1 
-        train_stats = algo.train() 
-        logger.store(train_stats) 
+        if ep%args.train_freq ==0 : 
+            train_stats = algo.train() 
+            logger.store(train_stats) 
 
         if ep%args.log_freq ==0 : 
             logger.log_tabular(ep_stats,step=ep) 
