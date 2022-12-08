@@ -32,7 +32,7 @@ class A2C():
         self.multi_policy = multi_policy
         self.total_train_iters = 0 
         if self.multi_policy : 
-            self.num_iterations += self.num_agents
+            self.num_iterations *= self.num_agents
             assert type(self.policy) == dict 
             for id in range(1,self.num_agents+1):
                 self.policy[id] = self.policy[id].to(self.device)
@@ -96,6 +96,7 @@ class A2C():
                 e_loss.append(entropy_loss.item())
             self.total_train_iters += 1 
         train_stats = {} 
+
         if self.multi_policy : 
             for agent_id in range(1,self.num_agents+1) : 
                 train_stats['Agent {} Policy Loss'.format(agent_id)] = np.mean(p_loss[agent_id])
