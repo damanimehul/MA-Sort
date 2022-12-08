@@ -73,9 +73,10 @@ class SortingEnv(gym.Env):
         stat_dict['Fights'] = self.fights 
         stat_dict['Redundant Fights'] = self.redundant_fights 
         stat_dict['Solved'] = int(self.solved) *100 
+        stat_dict['Final Solved'] = int(self.final_solved)*100
         stat_dict['All on Reward States'] = int(self.all_on_reward_states) *100 
         stat_dict['Invalid Actions'] = self.invalid_actions / self.n  
-
+        
         for id in range(1,self.n+1) : 
             stat_dict['Agent {} returns'.format(id)] = sum(self.agents[id].reward_history)
         return stat_dict 
@@ -85,6 +86,8 @@ class SortingEnv(gym.Env):
         for monkey in self.agents.values() : 
             monkey.update(new_positions[monkey.id],rewards[monkey.id],had_fight_dict[monkey.id]) 
         self.agent_map.set_agent_positions(new_positions)
+
+        self.final_solved = self.check_solved(new_positions)
         if not self.solved : 
             self.solved = self.check_solved(new_positions)
         self.all_on_reward_states  = self.check_on_reward_states(new_positions)

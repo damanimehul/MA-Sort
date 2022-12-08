@@ -12,7 +12,7 @@ if __name__ =='__main__' :
     parser.add_argument('--seed',type=int,default=0,help='Number of agents to make the environment from')
     parser.add_argument('--random_init',action='store_true',default=False,help='Agent positions are sampled randomly on the grid') 
     parser.add_argument('--save_gifs',action='store_true',default=False,help='GIFS are saved periodically every gif_frequency steps') 
-    parser.add_argument('--gif_frequency',type=int,default=250,help='New gif every 50 episodes')
+    parser.add_argument('--gif_frequency',type=int,default=500,help='New gif every 50 episodes')
     parser.add_argument('--gamma',type=float,default=0.995,help='Discount Factor')
     parser.add_argument('--train_episodes',type=int,default=20000,help='Number of episodes to train for')
     parser.add_argument('--wandb',action='store_true',default=False,help='Log on wandb')
