@@ -6,10 +6,11 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 class Observer: 
-    def __init__(self,env,obs_type='grid',fights_info=True) :
+    def __init__(self,env,obs_type='grid',fights_info=True,memory=True) :
         self.env = env 
         self.obs_type = obs_type  
         self.fights_info = fights_info 
+        self.memory = memory 
         self.observation_shape = self.obs_shape() 
 
     def obs_shape(self) : 
@@ -17,10 +18,13 @@ class Observer:
             size = max(self.env.height,self.env.width)
             return {'grid':[size,size,3]} 
         elif self.obs_type == 'features' : 
-            # shape = all agent positions + banana locations + my position + my id 
-            shape = self.env.n*2 + self.env.n*2 + 2 + self.env.n+ 1 
+            # shape = all agent positions + banana locations + my position + my id +
+            shape = self.env.n*2 + self.env.n*2 + 2 + self.env.n+ 1
             if self.fights_info : 
                 shape +=2 
+            if self.memory : 
+                # my best bound 
+                shape += self.env.n 
             return {'features':shape} 
         elif self.obs_type == 'both' : 
             size = max(self.env.height,self.env.width)
@@ -86,6 +90,11 @@ class Observer:
                 else :
                     ratio = 0
                 obs = np.concatenate([obs,[ratio,min(total_fights,self.env.n)]])
+            if self.memory : 
+                best_bound = self.env.agents[id].get_best_bound(self.env) 
+                one_hot_id = np.zeros((self.env.n)) 
+                one_hot_id[best_bound] = 1 
+                obs = np.concatenate([obs,one_hot_id])
             obs_dict[id] = obs 
         return obs_dict
      
@@ -113,5 +122,9 @@ class Observer:
         obs = np.concatenate([all_pos,reward_pos,pos,one_hot_id,[agent.fight_history[-1]]])
         if self.fights_info : 
             obs = np.concatenate([obs,[0,0]])
+        if self.memory : 
+                one_hot_id = np.zeros((self.env.n)) 
+                one_hot_id[0] = 1 
+                obs = np.concatenate([obs,one_hot_id])
         obs_dict[agent_id] = obs 
         return obs_dict

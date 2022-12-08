@@ -13,7 +13,7 @@ import seaborn as sns
 
 class SortingEnv(gym.Env):
     def __init__(self,n=4,random_init=False,obs_type='features',fights_info=True,
-    shuffle_ranks=True,norm_reward= False) :
+    shuffle_ranks=True,norm_reward= False,memory =False) :
         self.height = 5 
         self.n = n 
         if self.n%2!=0:
@@ -42,7 +42,7 @@ class SortingEnv(gym.Env):
 
         # These might change
         self.random_init = random_init
-        self.observer = Observer(self,obs_type,fights_info=fights_info)  
+        self.observer = Observer(self,obs_type,fights_info=fights_info,memory=memory)  
         self.observation_shape = self.observer.observation_shape 
         self.shuffle_ranks = shuffle_ranks
         self.norm_reward = norm_reward
@@ -387,7 +387,7 @@ class SortingEnv(gym.Env):
 if __name__=='__main__': 
     import Observers 
     import env_utils
-    env = SortingEnv(4,shuffle_ranks=False,fights_info=False) 
+    env = SortingEnv(4,shuffle_ranks=False,fights_info=False,memory=True) 
     map = env.reset()
     array = env.render() 
     plt.imshow(array) 
@@ -404,8 +404,8 @@ if __name__=='__main__':
             try :
                 print(actions)
                 o,r,_,_ = env.step(actions) 
-                print(o)
-                print('r',r)
+               # print(o)
+               # print('r',r)
             except :
                 break_flag = 1 
                 break

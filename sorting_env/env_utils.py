@@ -20,13 +20,22 @@ class Monkey :
         self.had_fight = 0 
         self.fight_dict = {} 
         self.fight_history = [0]
-        
+         
     def update(self,new_pos,r,had_fight) : 
         self.pos = new_pos 
         self.position_history.append(new_pos) 
         self.reward_history.append(r) 
         self.fight_history.append(had_fight)
-
+        
+    def get_best_bound(self,env): 
+        fight_graph = env.fight_graph 
+        best_bound = 0 
+        for id in range(1,env.n+1) : 
+            if id!= self.id : 
+                if fight_graph.check_path(id,self.id) : 
+                    best_bound += 1
+        return best_bound
+                
     def fight_update(self,win,agent_id) : 
         self.fight_dict[agent_id] = win 
         if win :
@@ -119,7 +128,10 @@ class FightGraph() :
         else : 
             self.graph.add_edge(win_agent,losing_agent) 
             return False 
-        
+
+    def check_path(self,w,l) : 
+        return nx.has_path(self.graph,w,l)
+
     def reset(self) : 
         self.graph = nx.DiGraph()  
         for i in range(1,self.env.n+1) : 
