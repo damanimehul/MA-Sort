@@ -51,6 +51,7 @@ class SortingEnv(gym.Env):
         self.reset() 
 
     def reset(self) : 
+        self.ep_step = 0 
         self.fight_history = {} 
         self.fight_graph.reset() 
         self.solved = False 
@@ -92,6 +93,7 @@ class SortingEnv(gym.Env):
             self.solved = self.check_solved(new_positions)
         self.all_on_reward_states  = self.check_on_reward_states(new_positions)
         
+        self.ep_step+=1 
         #Normalizes the banana rewards given 
         if self.norm_reward : 
             for k,v in rewards.items() : 
@@ -348,7 +350,8 @@ class SortingEnv(gym.Env):
             for j in range(self.width) : 
                 if v_map[i][j] == 10000: 
                     v_map[i][j] = v_min 
-
+        v_map /= np.linalg.norm(v_map) 
+        
         plot = sns.heatmap(v_map,linewidth=0.5)
         plt.close() 
         return plot 
@@ -390,16 +393,16 @@ class SortingEnv(gym.Env):
 if __name__=='__main__': 
     import Observers 
     import env_utils
-    env = SortingEnv(4,shuffle_ranks=False,fights_info=False,memory=True) 
+    env = SortingEnv(4,shuffle_ranks=False,fights_info=True,memory=True) 
     map = env.reset()
     array = env.render() 
     plt.imshow(array) 
     plt.show() 
     plt.close() 
     break_flag = 0
-    for j in range(1): 
+    for j in range(5): 
         imgs =[Image.fromarray(array)] 
-        for _ in range(20) : 
+        for _ in range(5) : 
             actions = {} 
             a = str(input('a:'))
             for i in range(1,5) : 
@@ -407,7 +410,7 @@ if __name__=='__main__':
             try :
                 print(actions)
                 o,r,_,_ = env.step(actions) 
-               # print(o)
+                print(o)
                # print('r',r)
             except :
                 break_flag = 1 

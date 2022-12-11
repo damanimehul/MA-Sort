@@ -17,9 +17,10 @@ def set_algo(args,policy,buffer,env,logger) :
     gif_frequency = args.gif_frequency  
     gif_path = logger.gif_directory 
     v_coeff = args.v_coeff 
+    ent_coeff = args.ent_coeff 
     if args.algo =='a2c' : 
         return A2C(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
-    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy) 
+    save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy,ent_coef=ent_coeff) 
     elif args.algo == 'ppo' : 
         return PPO(policy=policy,buffer=buffer,env=env,gamma=gamma,multi_agent=multi_agent,max_ep_len=max_ep_len,
     save_gifs=save_gifs,gif_frequency=gif_frequency,gif_path=gif_path,vf_coef=v_coeff,multi_policy=args.multi_policy) 
