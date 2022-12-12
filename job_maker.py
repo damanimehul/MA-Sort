@@ -53,7 +53,7 @@ def remove_ignore_configs(grid,ignore) :
     return new_grid 
         
 if __name__ == '__main__': 
-    grid = {"multi_policy":['',None],"n":[2,4],"ent_coef":[0,0.25],"shuffle_ranks":['',None],"memory":[''],"fights_info":['']} 
+    grid = {"multi_policy":['',None],"n":[2,4],"gae_lambda":[0,0.5],"shuffle_ranks":['',None],"memory":[''],"fights_info":['']} 
     configs = [''] 
     args = get_args() 
 

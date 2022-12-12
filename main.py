@@ -29,7 +29,8 @@ if __name__ =='__main__' :
     parser.add_argument('--train_freq',type=int,default=10,help='How many episodes to rollout before calling algo.train() ')
     parser.add_argument('--algo',type=str,default='a2c',help='Which algorithm to run between A2C/PPO ')
     parser.add_argument('--memory',action='store_true',default=False,help='Give agents a feature which provides the agents best current rank (basically providing the soln)')
-    parser.add_argument('--ent_coeff',type=float,default=0,help='Coefficient on entropy loss')
+    parser.add_argument('--gae_lambda',type=float,default=1,help='lambda for advantage estimation')
+    parser.add_argument('--ent_coeff',type=float,default=0.2,help='Coefficient on entropy loss')
     args = parser.parse_args()  
 
     if args.tag is None : 
