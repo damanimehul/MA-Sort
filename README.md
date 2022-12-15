@@ -3,7 +3,7 @@ This is the official codebase of MA-Sort, a MARL enviornment for comparison-base
 
 ## Setting up the codebase
 Install conda environment using - 
-'''
+```
 conda env create -f requirements.yaml 
-'''
+```
  
